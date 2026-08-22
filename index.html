@@ -3,55 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Trabajos y Jornada</title>
+  <title>Control de Trabajos y Jornada con Drag & Drop</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Librería EmailJS -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <style>
+    .drag-over {
+      border-color: #3b82f6 !important;
+      background-color: #eff6ff !important;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
 
   <nav class="bg-blue-700 text-white p-4 flex gap-4 font-semibold shadow-md overflow-x-auto">
-    <button onclick="verPantalla('nuevoDia')" class="hover:underline whitespace-nowrap">Iniciar Día</button>
+    <button onclick="verPantalla('nuevoDia')" class="hover:underline whitespace-nowrap">Iniciar Día / Tablero</button>
     <button onclick="verPantalla('historial')" class="hover:underline whitespace-nowrap">Historial</button>
     <button onclick="verPantalla('comentarios')" class="hover:underline whitespace-nowrap">Comentarios Rápidos</button>
     <button onclick="verPantalla('ajustes')" class="hover:underline whitespace-nowrap">Ajustes</button>
   </nav>
 
-  <main class="p-6 max-w-4xl mx-auto">
+  <main class="p-6 max-w-6xl mx-auto">
 
-    <!-- INICIAR NUEVO DÍA -->
+    <!-- INICIAR NUEVO DÍA / TABLERO INTERACTIVO -->
     <section id="nuevoDia" class="pantalla">
-      <h1 class="text-2xl font-bold mb-4">Iniciar Nuevo Día</h1>
-      <div class="bg-white p-6 rounded shadow space-y-4">
-        <div>
-          <label class="block font-medium mb-1">Fecha:</label>
-          <input type="date" id="fechaDia" class="border p-2 rounded w-full">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+        <h1 class="text-2xl font-bold">Planificación y Control del Día</h1>
+        <div class="flex items-center gap-3 bg-white p-2 rounded shadow">
+          <label class="font-medium text-sm">Fecha:</label>
+          <input type="date" id="fechaDia" class="border p-1 rounded text-sm">
         </div>
-        <div>
-          <label class="block font-medium mb-1">Seleccionar Trabajo:</label>
-          <select id="selectTrabajo" class="border p-2 rounded w-full"></select>
-        </div>
-        <div>
-          <label class="block font-medium mb-1">Seleccionar Trabajador(es): <span class="text-xs text-gray-500">(Puedes marcar varios)</span></label>
-          <div id="listaTrabajadoresCheck" class="border p-3 rounded max-h-40 overflow-y-auto space-y-2 bg-gray-50"></div>
-        </div>
-        <div>
-          <label class="block font-medium mb-1">Observaciones:</label>
-          <textarea id="obsDia" class="border p-2 rounded w-full" rows="2" placeholder="Notas sobre el trabajo o personal..."></textarea>
-        </div>
-        
-        <button onclick="iniciarContador()" class="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700">
-          Iniciar Trabajo
-        </button>
+      </div>
 
-        <!-- Reloj / Cuenta atrás -->
-        <div id="panelTimer" class="hidden border-t pt-4 mt-4">
-          <p class="text-lg font-semibold">Trabajo en curso: <span id="timerMinutos" class="text-2xl font-bold text-blue-600">00:00</span></p>
-          <button onclick="finalizarTrabajo()" class="bg-red-600 text-white px-4 py-2 rounded mt-2 font-bold hover:bg-red-700">
-            Finalizar Trabajo y Guardar
+      <!-- Panel de Configuración del Día (Trabajos a realizar hoy) -->
+      <div class="bg-white p-4 rounded shadow mb-6">
+        <h2 class="font-bold text-gray-700 mb-2">1. Selecciona los trabajos que se realizarán hoy:</h2>
+        <div id="selectorTrabajosHoy" class="flex flex-wrap gap-2 mb-3"></div>
+        <div class="flex gap-2">
+          <button onclick="generarTableroDia()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700 text-sm">
+            Cargar Trabajos en el Tablero
+          </button>
+          <button onclick="finalizarJornadaDia()" class="bg-green-700 text-white px-4 py-2 rounded font-bold hover:bg-green-800 text-sm ml-auto">
+            Finalizar y Guardar Jornada Completa
           </button>
         </div>
+      </div>
+
+      <!-- Zona de Arrastrar y Soltar (Tablero) -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        
+        <!-- Columna Lateral: Trabajadores Disponibles -->
+        <div class="md:col-span-1 bg-white p-4 rounded shadow">
+          <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex justify-between items-center">
+            <span>Trabajadores</span>
+            <span class="text-xs font-normal text-gray-500">(Arrastra a un trabajo)</span>
+          </h2>
+          <div id="poolTrabajadores" class="space-y-2 min-h-[200px] p-2 bg-gray-50 rounded border-2 border-dashed border-gray-200"
+               ondragover="allowDrop(event)" ondrop="dropTrabajador(event, 'pool')">
+          </div>
+        </div>
+
+        <!-- Columna Principal: Tarjetas de Trabajo Independientes -->
+        <div class="md:col-span-3">
+          <div id="contenedorTarjetasTrabajo" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <p class="text-gray-500 italic col-span-2">Selecciona los trabajos arriba y pulsa "Cargar Trabajos en el Tablero".</p>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -74,8 +92,9 @@
             <tr class="border-b bg-gray-50">
               <th class="p-2">Fecha</th>
               <th class="p-2">Trabajo</th>
-              <th class="p-2">Trabajadores</th>
-              <th class="p-2">Tiempo Teórico</th>
+              <th class="p-2">Trabajador</th>
+              <th class="p-2">T. Teórico</th>
+              <th class="p-2">T. Real Empleado</th>
               <th class="p-2">Observaciones</th>
             </tr>
           </thead>
@@ -93,7 +112,6 @@
           <select id="selectTrabajadorComentario" class="border p-2 rounded w-full"></select>
         </div>
         
-        <!-- Selector rápido de notas predefinidas -->
         <div id="contenedorNotasRapidasUI" class="hidden">
           <label class="block font-medium mb-1 text-sm text-indigo-600">O seleccionar nota rápida predefinida:</label>
           <select id="selectNotaRapidaUI" onchange="usarNotaRapida()" class="border p-2 rounded w-full bg-indigo-50 text-indigo-900 text-sm">
@@ -188,13 +206,17 @@
       comentarios: []
     };
 
-    let timerId = null;
-    let trabajoActivo = null;
+    let estadoTablero = {
+      trabajosActivos: {}, 
+      asignaciones: {}     
+    };
+
+    let intervalGlobal = null;
 
     function guardarDB() {
       localStorage.setItem('appData', JSON.stringify(DB));
       cargarAjustes();
-      cargarFormularioDia();
+      cargarSelectorTrabajosHoy();
     }
 
     function verPantalla(id) {
@@ -211,7 +233,7 @@
       const nombre = document.getElementById('nombreTrabajo').value.trim();
       const tiempo = parseInt(document.getElementById('tiempoTrabajo').value);
       if(nombre && tiempo) {
-        DB.trabajos.push({ id: Date.now(), nombre, tiempo });
+        DB.trabajos.push({ id: Date.now().toString(), nombre, tiempo });
         document.getElementById('nombreTrabajo').value = '';
         document.getElementById('tiempoTrabajo').value = '';
         guardarDB();
@@ -219,106 +241,288 @@
     }
 
     function delTrabajo(id) {
-      DB.trabajos = DB.trabajos.filter(t => t.id !== id);
+      DB.trabajos = DB.trabajos.filter(t => t.id !== id.toString());
       guardarDB();
     }
 
     function addTrabajador() {
       const nombre = document.getElementById('nombreTrabajador').value.trim();
       if(nombre) {
-        DB.trabajadores.push({ id: Date.now(), nombre });
+        DB.trabajadores.push({ id: Date.now().toString(), nombre });
         document.getElementById('nombreTrabajador').value = '';
         guardarDB();
       }
     }
 
     function delTrabajador(id) {
-      DB.trabajadores = DB.trabajadores.filter(t => t.id !== id);
+      DB.trabajadores = DB.trabajadores.filter(t => t.id !== id.toString());
       guardarDB();
     }
 
     function addNotaRapida() {
       const texto = document.getElementById('textoNotaRapida').value.trim();
       if(texto) {
-        DB.notasRapidas.push({ id: Date.now(), texto });
+        DB.notasRapidas.push({ id: Date.now().toString(), texto });
         document.getElementById('textoNotaRapida').value = '';
         guardarDB();
       }
     }
 
     function delNotaRapida(id) {
-      DB.notasRapidas = DB.notasRapidas.filter(n => n.id !== id);
+      DB.notasRapidas = DB.notasRapidas.filter(n => n.id !== id.toString());
       guardarDB();
     }
 
     function cargarAjustes() {
       document.getElementById('listaTrabajos').innerHTML = DB.trabajos.map(t => 
-        `<li class="py-2 flex justify-between items-center">${t.nombre} (${t.tiempo} min) <button onclick="delTrabajo(${t.id})" class="text-red-600 font-bold px-2">X</button></li>`
+        `<li class="py-2 flex justify-between items-center">${t.nombre} (${t.tiempo} min) <button onclick="delTrabajo('${t.id}')" class="text-red-600 font-bold px-2">X</button></li>`
       ).join('');
       
       document.getElementById('listaTrabajadores').innerHTML = DB.trabajadores.map(t => 
-        `<li class="py-2 flex justify-between items-center">${t.nombre} <button onclick="delTrabajador(${t.id})" class="text-red-600 font-bold px-2">X</button></li>`
+        `<li class="py-2 flex justify-between items-center">${t.nombre} <button onclick="delTrabajador('${t.id}')" class="text-red-600 font-bold px-2">X</button></li>`
       ).join('');
 
       document.getElementById('listaNotasRapidas').innerHTML = DB.notasRapidas.map(n => 
-        `<li class="py-2 flex justify-between items-center">${n.texto} <button onclick="delNotaRapida(${n.id})" class="text-red-600 font-bold px-2">X</button></li>`
+        `<li class="py-2 flex justify-between items-center">${n.texto} <button onclick="delNotaRapida('${n.id}')" class="text-red-600 font-bold px-2">X</button></li>`
       ).join('');
     }
 
-    // --- INICIAR DÍA ---
-    function cargarFormularioDia() {
-      document.getElementById('selectTrabajo').innerHTML = DB.trabajos.map(t => 
-        `<option value="${t.id}">${t.nombre} (${t.tiempo} min)</option>`
-      ).join('');
+    // --- TABLERO Y DRAG & DROP ---
+    function cargarSelectorTrabajosHoy() {
+      document.getElementById('selectorTrabajosHoy').innerHTML = DB.trabajos.map(t => `
+        <label class="inline-flex items-center gap-1 bg-gray-100 px-3 py-1 rounded border text-sm cursor-pointer hover:bg-gray-200">
+          <input type="checkbox" value="${t.id}" class="chk-trabajo-hoy" checked> ${t.nombre} (${t.tiempo}m)
+        </label>
+      `).join('');
 
-      // Renderiza los checkboxes de selección múltiple de trabajadores
-      document.getElementById('listaTrabajadoresCheck').innerHTML = DB.trabajadores.length > 0 
-        ? DB.trabajadores.map(t => `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="${t.nombre}" class="rounded text-blue-600 w-4 h-4"> ${t.nombre}</label>`).join('')
-        : '<p class="text-gray-400 text-sm italic">No hay trabajadores añadidos en Ajustes.</p>';
+      renderPoolTrabajadores();
     }
 
-    function iniciarContador() {
-      const trabajoId = document.getElementById('selectTrabajo').value;
-      const trabajo = DB.trabajos.find(t => t.id == trabajoId);
-      if(!trabajo) return alert("Añade primero un trabajo en Ajustes");
+    function renderPoolTrabajadores() {
+      const pool = document.getElementById('poolTrabajadores');
+      const asignados = Object.keys(estadoTablero.asignaciones).filter(t => estadoTablero.asignaciones[t].trabajoId !== null);
+      const libres = DB.trabajadores.filter(t => !asignados.includes(t.nombre));
 
-      trabajoActivo = trabajo;
-      let segundos = trabajo.tiempo * 60;
+      pool.innerHTML = libres.map(t => `
+        <div id="trabajador-${t.nombre}" draggable="true" ondragstart="drag(event)" 
+             class="bg-white p-2 rounded shadow border border-gray-300 font-medium cursor-grab active:cursor-grabbing hover:border-blue-500">
+          👤 ${t.nombre}
+        </div>
+      `).join('');
+    }
+
+    function generarTableroDia() {
+      const seleccionados = Array.from(document.querySelectorAll('.chk-trabajo-hoy:checked')).map(c => c.value);
+      const contenedor = document.getElementById('contenedorTarjetasTrabajo');
+
+      if(seleccionados.length === 0) {
+        contenedor.innerHTML = `<p class="text-red-500 italic col-span-2">Selecciona al menos un trabajo.</p>`;
+        return;
+      }
+
+      contenedor.innerHTML = '';
+
+      seleccionados.forEach(id => {
+        const trabajo = DB.trabajos.find(t => t.id === id);
+        if(!trabajo) return;
+
+        if(!estadoTablero.trabajosActivos[id]) {
+          estadoTablero.trabajosActivos[id] = {
+            id: trabajo.id,
+            nombre: trabajo.nombre,
+            tiempoTeorico: trabajo.tiempo,
+            segundosRestantes: trabajo.tiempo * 60,
+            corriendo: false
+          };
+        }
+
+        const info = estadoTablero.trabajosActivos[id];
+        const min = Math.floor(info.segundosRestantes / 60);
+        const seg = info.segundosRestantes % 60;
+        const relojTexto = `${min.toString().padStart(2, '0')}:${seg.toString().padStart(2, '0')}`;
+
+        const tarjetaHTML = `
+          <div class="bg-white p-4 rounded shadow border-t-4 border-blue-600 flex flex-col justify-between" id="card-trabajo-${id}">
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <h3 class="font-bold text-lg text-gray-800">${trabajo.nombre}</h3>
+                <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded">${trabajo.tiempo} min</span>
+              </div>
+              
+              <div class="bg-gray-900 text-green-400 font-mono text-center text-3xl py-2 rounded mb-3 shadow-inner" id="timer-display-${id}">
+                ${relojTexto}
+              </div>
+
+              <div class="flex gap-2 mb-4">
+                <button onclick="toggleRelojTrabajo('${id}')" id="btn-reloj-${id}" class="flex-1 text-white text-xs font-bold py-1.5 rounded ${info.corriendo ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}">
+                  ${info.corriendo ? 'Pausar' : 'Iniciar Cuenta Atrás'}
+                </button>
+              </div>
+
+              <label class="block text-xs font-bold text-gray-500 mb-1">Trabajadores en este trabajo:</label>
+              <div id="dropzone-${id}" ondragover="allowDrop(event)" ondrop="dropTrabajador(event, '${id}')"
+                   class="min-h-[100px] bg-blue-50/50 p-2 rounded border-2 border-dashed border-blue-200 space-y-2">
+              </div>
+            </div>
+
+            <div class="mt-4 border-t pt-2">
+              <label class="block text-xs font-bold text-gray-500 mb-1">Observaciones del trabajo:</label>
+              <input type="text" id="obs-trabajo-${id}" placeholder="Notas específicas..." class="border p-1 text-xs rounded w-full">
+            </div>
+          </div>
+        `;
+        contenedor.insertAdjacentHTML('beforeend', tarjetaHTML);
+      });
+
+      iniciarBucleGlobal();
+      reubicarTrabajadoresEnTablero();
+    }
+
+    function allowDrop(ev) {
+      ev.preventDefault();
+      ev.currentTarget.classList.add('drag-over');
+    }
+
+    function drag(ev) {
+      const nombreTrabajador = ev.target.id.replace('trabajador-', '');
+      ev.dataTransfer.setData("text/plain", nombreTrabajador);
+    }
+
+    function dropTrabajador(ev, destinoId) {
+      ev.preventDefault();
+      document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      const nombre = ev.dataTransfer.getData("text/plain");
+
+      if(!nombre) return;
+
+      const ahora = Date.now();
+
+      if(!estadoTablero.asignaciones[nombre]) {
+        estadoTablero.asignaciones[nombre] = { trabajoId: null, tiempoInicioAsignacion: null, acumulado: {} };
+      }
+
+      const infoReg = estadoTablero.asignaciones[nombre];
+
+      if(infoReg.trabajoId && infoReg.tiempoInicioAsignacion) {
+        const duracionSegundos = Math.round((ahora - infoReg.tiempoInicioAsignacion) / 1000);
+        const trabAnt = infoReg.trabajoId;
+        infoReg.acumulado[trabAnt] = (infoReg.acumulado[trabAnt] || 0) + duracionSegundos;
+      }
+
+      if(destinoId === 'pool') {
+        infoReg.trabajoId = null;
+        infoReg.tiempoInicioAsignacion = null;
+      } else {
+        infoReg.trabajoId = destinoId;
+        infoReg.tiempoInicioAsignacion = ahora;
+      }
+
+      reubicarTrabajadoresEnTablero();
+    }
+
+    function reubicarTrabajadoresEnTablero() {
+      renderPoolTrabajadores();
+
+      Object.keys(estadoTablero.trabajosActivos).forEach(id => {
+        const dropzone = document.getElementById(`dropzone-${id}`);
+        if(dropzone) dropzone.innerHTML = '';
+      });
+
+      Object.keys(estadoTablero.asignaciones).forEach(nombre => {
+        const asig = estadoTablero.asignaciones[nombre];
+        if(asig.trabajoId) {
+          const dropzone = document.getElementById(`dropzone-${asig.trabajoId}`);
+          if(dropzone) {
+            dropzone.innerHTML += `
+              <div id="trabajador-${nombre}" draggable="true" ondragstart="drag(event)" 
+                   class="bg-white p-2 rounded shadow border border-blue-300 text-sm font-semibold flex justify-between items-center cursor-grab active:cursor-grabbing">
+                <span>👤 ${nombre}</span>
+                <span class="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-mono">Activo</span>
+              </div>
+            `;
+          }
+        }
+      });
+    }
+
+    // --- TEMPORIZADORES ---
+    function toggleRelojTrabajo(id) {
+      const info = estadoTablero.trabajosActivos[id];
+      if(!info) return;
+      info.corriendo = !info.corriendo;
       
-      document.getElementById('panelTimer').classList.remove('hidden');
-      
-      clearInterval(timerId);
-      timerId = setInterval(() => {
-        segundos--;
-        const min = Math.floor(segundos / 60);
-        const seg = segundos % 60;
-        document.getElementById('timerMinutos').textContent = `${min.toString().padStart(2, '0')}:${seg.toString().padStart(2, '0')}`;
-        if(segundos <= 0) clearInterval(timerId);
+      const btn = document.getElementById(`btn-reloj-${id}`);
+      if(btn) {
+        btn.textContent = info.corriendo ? 'Pausar' : 'Iniciar Cuenta Atrás';
+        btn.className = `flex-1 text-white text-xs font-bold py-1.5 rounded ${info.corriendo ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`;
+      }
+    }
+
+    function iniciarBucleGlobal() {
+      if(intervalGlobal) return;
+      intervalGlobal = setInterval(() => {
+        Object.keys(estadoTablero.trabajosActivos).forEach(id => {
+          const info = estadoTablero.trabajosActivos[id];
+          if(info && info.corriendo && info.segundosRestantes > 0) {
+            info.segundosRestantes--;
+            const min = Math.floor(info.segundosRestantes / 60);
+            const seg = info.segundosRestantes % 60;
+            const display = document.getElementById(`timer-display-${id}`);
+            if(display) {
+              display.textContent = `${min.toString().padStart(2, '0')}:${seg.toString().padStart(2, '0')}`;
+            }
+          }
+        });
       }, 1000);
     }
 
-    function finalizarTrabajo() {
-      clearInterval(timerId);
-      document.getElementById('panelTimer').classList.add('hidden');
+    // --- FINALIZAR JORNADA ---
+    function finalizarJornadaDia() {
+      const fecha = document.getElementById('fechaDia').value;
+      const ahora = Date.now();
 
-      // Captura múltiples trabajadores seleccionados
-      const seleccionados = Array.from(document.querySelectorAll('#listaTrabajadoresCheck input:checked')).map(c => c.value);
-      
-      const nuevoRegistro = {
-        fecha: document.getElementById('fechaDia').value,
-        trabajo: trabajoActivo.nombre,
-        tiempo: trabajoActivo.tiempo + " min",
-        trabajadores: seleccionados.join(', ') || 'Ninguno',
-        observaciones: document.getElementById('obsDia').value
-      };
+      Object.keys(estadoTablero.asignaciones).forEach(nombre => {
+        const info = estadoTablero.asignaciones[nombre];
+        if(info.trabajoId && info.tiempoInicioAsignacion) {
+          const duracion = Math.round((ahora - info.tiempoInicioAsignacion) / 1000);
+          info.acumulado[info.trabajoId] = (info.acumulado[info.trabajoId] || 0) + duracion;
+          info.tiempoInicioAsignacion = ahora;
+        }
+      });
 
-      DB.registros.push(nuevoRegistro);
+      let registrosGuardados = 0;
+
+      Object.keys(estadoTablero.asignaciones).forEach(nombre => {
+        const asig = estadoTablero.asignaciones[nombre];
+        Object.keys(asig.acumulado).forEach(trabajoId => {
+          const segundosTrabajados = asig.acumulado[trabajoId];
+          if(segundosTrabajados > 0) {
+            const trabajoObj = DB.trabajos.find(t => t.id === trabajoId) || { nombre: 'Desconocido', tiempo: 0 };
+            const minutosReales = Math.max(1, Math.round(segundosTrabajados / 60));
+            const inputObs = document.getElementById(`obs-trabajo-${trabajoId}`);
+
+            DB.registros.push({
+              fecha: fecha,
+              trabajo: trabajoObj.nombre,
+              trabajador: nombre,
+              tiempoTeorico: trabajoObj.tiempo + " min",
+              tiempoReal: minutosReales + " min",
+              observaciones: inputObs ? inputObs.value : ''
+            });
+            registrosGuardados++;
+          }
+        });
+      });
+
+      if(registrosGuardados === 0) {
+        return alert("No se registraron movimientos de trabajadores en los trabajos.");
+      }
+
       guardarDB();
-      document.getElementById('obsDia').value = '';
+      alert(`¡Jornada finalizada y guardada! Se han generado ${registrosGuardados} registros detallados.`);
       
-      // Desmarcar checkboxes después de guardar
-      document.querySelectorAll('#listaTrabajadoresCheck input').forEach(cb => cb.checked = false);
-      alert("Trabajo guardado en el historial");
+      estadoTablero.asignaciones = {};
+      generarTableroDia();
     }
 
     // --- HISTORIAL & EXPORTAR ---
@@ -327,8 +531,9 @@
         <tr class="border-b">
           <td class="p-2">${r.fecha}</td>
           <td class="p-2 font-semibold">${r.trabajo}</td>
-          <td class="p-2">${r.trabajadores}</td>
-          <td class="p-2">${r.tiempo}</td>
+          <td class="p-2">${r.trabajador}</td>
+          <td class="p-2">${r.tiempoTeorico}</td>
+          <td class="p-2 font-bold text-blue-700">${r.tiempoReal}</td>
           <td class="p-2 text-sm text-gray-600">${r.observaciones}</td>
         </tr>
       `).join('');
@@ -358,9 +563,9 @@
 
       exportarExcel();
 
-      let textoResumen = "Resumen del día:\n\n";
+      let textoResumen = "Resumen detallado del día:\n\n";
       DB.registros.forEach(r => {
-        textoResumen += `- Fecha: ${r.fecha} | Trabajo: ${r.trabajo} | Personal: ${r.trabajadores} | Notas: ${r.observaciones}\n`;
+        textoResumen += `- Fecha: ${r.fecha} | Trabajo: ${r.trabajo} | Trabajador: ${r.trabajador} | T. Real: ${r.tiempoReal} | Notas: ${r.observaciones}\n`;
       });
 
       const subject = encodeURIComponent(`Reporte de Jornada - ${new Date().toLocaleDateString()}`);
@@ -375,7 +580,7 @@
       if(!email) return alert("Introduce un correo de destino");
 
       let resumen = DB.registros.map(r => 
-        `Fecha: ${r.fecha} - Trabajo: ${r.trabajo} (${r.tiempo}) - Personal: ${r.trabajadores} - Obs: ${r.observaciones}`
+        `Fecha: ${r.fecha} - Trabajo: ${r.trabajo} - Trabajador: ${r.trabajador} - T. Real: ${r.tiempoReal} - Obs: ${r.observaciones}`
       ).join("\n");
 
       const templateParams = {
@@ -399,7 +604,6 @@
         `<option value="${t.nombre}">${t.nombre}</option>`
       ).join('');
 
-      // Carga el selector de notas rápidas en la pantalla de comentarios
       const selectNota = document.getElementById('selectNotaRapidaUI');
       const contenedorNotas = document.getElementById('contenedorNotasRapidasUI');
       
@@ -444,7 +648,7 @@
 
     // Carga inicial
     cargarAjustes();
-    cargarFormularioDia();
+    cargarSelectorTrabajosHoy();
   </script>
 </body>
 </html>
