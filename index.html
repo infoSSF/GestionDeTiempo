@@ -3,49 +3,204 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestión de Personal</title>
+  <title>Sistema de Gestión de Personal</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 p-8 font-sans">
+<body class="bg-gray-100 min-h-screen p-6 font-sans">
 
-  <!-- TARJETA DEL TRABAJADOR (EJEMPLO) -->
-  <div class="max-w-xs bg-white rounded-xl shadow-md p-4 relative border border-gray-200">
-    <button onclick="openModal()" class="absolute top-2 right-2 w-7 h-7 bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded-full text-gray-500 flex items-center justify-center font-bold transition">
-      ✕
-    </button>
-    <div class="flex items-center space-x-3">
-      <div class="w-10 h-10 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold">
-        JP
-      </div>
+  <!-- ENCABEZADO CON AJUSTES Y NOTAS RÁPIDAS -->
+  <header class="max-w-7xl mx-auto mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+    <div class="flex justify-between items-center">
       <div>
-        <h4 class="font-semibold text-gray-800">Juan Pérez</h4>
-        <p class="text-xs text-gray-500">Asignado a: Proyecto Alpha</p>
+        <h1 class="text-xl font-bold text-gray-800">Panel de Control de Personal</h1>
+        <p class="text-xs text-gray-500">Asigna, mueve y gestiona tus equipos de trabajo</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- BOTÓN NOTAS RÁPIDAS -->
+        <button onclick="toggleNotes()" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold rounded-lg border border-amber-300 flex items-center gap-1.5 transition">
+          <span>📝</span> Notas Rápidas
+        </button>
+        <!-- BOTÓN AJUSTES -->
+        <button onclick="openSettingsModal()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg border border-gray-300 flex items-center gap-1.5 transition">
+          <span>⚙️</span> Ajustes del Sistema
+        </button>
       </div>
     </div>
-  </div>
 
-  <!-- MODAL DE GESTIÓN -->
+    <!-- PANEL DESPLEGABLE DE NOTAS RÁPIDAS -->
+    <div id="notesPanel" class="hidden mt-4 pt-4 border-t border-gray-100">
+      <div class="flex justify-between items-center mb-2">
+        <label for="quickNotesInput" class="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
+          📌 Notas de turno / Recordatorios
+        </label>
+        <span id="saveStatus" class="text-[10px] text-gray-400">Guardado automático local</span>
+      </div>
+      <textarea id="quickNotesInput" oninput="saveNotes()" rows="3" placeholder="Escribe notas rápidas del equipo aquí (ej: 'Juan sale a las 4pm', 'Revisar material de Proyecto Alpha')..." class="w-full p-3 text-xs bg-amber-50/50 border border-amber-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-amber-400/70 resize-y"></textarea>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL (LAYOUT 2 COLUMNAS) -->
+  <main class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- COLUMNA IZQUIERDA: LISTA PRINCIPAL (DISPONIBLES) -->
+    <section class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col h-[650px]">
+      <div class="flex justify-between items-center mb-4 pb-2 border-b">
+        <h2 class="font-bold text-gray-800 flex items-center gap-2">
+          <span>📋</span> Lista Principal
+        </h2>
+        <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+          2 Disponibles
+        </span>
+      </div>
+
+      <!-- Tarjetas de trabajadores en espera -->
+      <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+        <div class="bg-emerald-50/50 border border-emerald-200 p-3 rounded-lg flex justify-between items-center">
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
+              CR
+            </div>
+            <div>
+              <p class="font-semibold text-sm text-gray-800">Carlos Ruiz</p>
+              <p class="text-[10px] text-emerald-600 font-medium">Disponible</p>
+            </div>
+          </div>
+          <button class="px-2.5 py-1 bg-white hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-300 text-xs font-medium rounded transition">
+            Asignar
+          </button>
+        </div>
+
+        <div class="bg-emerald-50/50 border border-emerald-200 p-3 rounded-lg flex justify-between items-center">
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
+              AT
+            </div>
+            <div>
+              <p class="font-semibold text-sm text-gray-800">Ana Torres</p>
+              <p class="text-[10px] text-emerald-600 font-medium">Disponible</p>
+            </div>
+          </div>
+          <button class="px-2.5 py-1 bg-white hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-300 text-xs font-medium rounded transition">
+            Asignar
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA: TRABAJOS EN PROCESO -->
+    <section class="md:col-span-2 space-y-4">
+      <h2 class="font-bold text-gray-800 flex items-center gap-2 mb-2">
+        <span>🏗️</span> Trabajos en Proceso
+      </h2>
+
+      <!-- TRABAJO 1 -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="font-bold text-gray-800 text-base">Proyecto Alpha</h3>
+          <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">2 personas en este trabajo</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="bg-gray-50 border border-gray-200 p-3 rounded-lg relative">
+            <button onclick="openModal('Juan Pérez', 'Proyecto Alpha')" title="Gestionar / Desvincular" class="absolute top-2 right-2 w-6 h-6 bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-full text-gray-400 flex items-center justify-center font-bold text-xs transition shadow-sm">
+              ✕
+            </button>
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
+                JP
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-gray-800">Juan Pérez</p>
+                <p class="text-[11px] text-gray-500">Operador Sr.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 border border-gray-200 p-3 rounded-lg relative">
+            <button onclick="openModal('María Gómez', 'Proyecto Alpha')" title="Gestionar / Desvincular" class="absolute top-2 right-2 w-6 h-6 bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-full text-gray-400 flex items-center justify-center font-bold text-xs transition shadow-sm">
+              ✕
+            </button>
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
+                MG
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-gray-800">María Gómez</p>
+                <p class="text-[11px] text-gray-500">Técnica de Control</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRABAJO 2 -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="font-bold text-gray-800 text-base">Línea de Montaje B</h3>
+          <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">1 persona en este trabajo</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="bg-gray-50 border border-gray-200 p-3 rounded-lg relative">
+            <button onclick="openModal('Luis Lima', 'Línea de Montaje B')" title="Gestionar / Desvincular" class="absolute top-2 right-2 w-6 h-6 bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-full text-gray-400 flex items-center justify-center font-bold text-xs transition shadow-sm">
+              ✕
+            </button>
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
+                LL
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-gray-800">Luis Lima</p>
+                <p class="text-[11px] text-gray-500">Ensamblador</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRABAJO 3 -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="font-bold text-gray-800 text-base">Mantenimiento Central</h3>
+          <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">1 persona en este trabajo</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="bg-gray-50 border border-gray-200 p-3 rounded-lg relative">
+            <button onclick="openModal('Pedro Picapiedra', 'Mantenimiento Central')" title="Gestionar / Desvincular" class="absolute top-2 right-2 w-6 h-6 bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-full text-gray-400 flex items-center justify-center font-bold text-xs transition shadow-sm">
+              ✕
+            </button>
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
+                PP
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-gray-800">Pedro Picapiedra</p>
+                <p class="text-[11px] text-gray-500">Especialista</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL DE GESTIÓN Y REASIGNACIÓN -->
   <div id="gestorModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 relative">
-      
-      <!-- Encabezado -->
       <div class="flex justify-between items-center pb-4 border-b">
-        <h3 class="text-lg font-bold text-gray-800">Gestión de personal: <span class="text-indigo-600">Juan Pérez</span></h3>
+        <h3 class="text-lg font-bold text-gray-800">Gestión de personal: <span id="modalNombre" class="text-indigo-600">--</span></h3>
         <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
       </div>
 
-      <!-- Opción 1: Desvincular -->
       <div class="my-5 p-4 bg-gray-50 rounded-lg border border-gray-200 flex justify-between items-center">
         <div>
           <p class="font-medium text-gray-800">Desvincular del trabajo actual</p>
-          <p class="text-xs text-gray-500">El trabajador volverá a la lista principal de disponibles.</p>
+          <p class="text-xs text-gray-500">Retira al trabajador de este puesto y lo envía a la Lista Principal.</p>
         </div>
         <button onclick="desvincular()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition">
           Desvincular
         </button>
       </div>
 
-      <!-- Opción 2: Reasignar -->
       <h4 class="font-semibold text-gray-700 mb-3 text-sm">O reasignar a otro trabajo en proceso:</h4>
       
       <div class="overflow-x-auto border border-gray-200 rounded-lg">
@@ -63,8 +218,8 @@
               <td class="p-3 font-medium text-gray-800">Proyecto Alpha</td>
               <td class="p-3">2 personas</td>
               <td class="p-3">
-                <span class="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs mr-1">Juan Pérez</span>
-                <span class="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs">María Gómez</span>
+                <span class="inline-block bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs mr-1">Juan Pérez</span>
+                <span class="inline-block bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs">María Gómez</span>
               </td>
               <td class="p-3 text-right">
                 <button onclick="reasignar('Proyecto Alpha')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md text-xs transition">
@@ -74,11 +229,9 @@
             </tr>
             <tr>
               <td class="p-3 font-medium text-gray-800">Línea de Montaje B</td>
-              <td class="p-3">3 personas</td>
+              <td class="p-3">1 persona</td>
               <td class="p-3">
-                <span class="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs mr-1">Carlos Ruiz</span>
-                <span class="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs mr-1">Ana Torres</span>
-                <span class="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs">Luis Lima</span>
+                <span class="inline-block bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs">Luis Lima</span>
               </td>
               <td class="p-3 text-right">
                 <button onclick="reasignar('Línea de Montaje B')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md text-xs transition">
@@ -90,7 +243,7 @@
               <td class="p-3 font-medium text-gray-800">Mantenimiento Central</td>
               <td class="p-3">1 persona</td>
               <td class="p-3">
-                <span class="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs">Pedro Picapiedra</span>
+                <span class="inline-block bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs">Pedro Picapiedra</span>
               </td>
               <td class="p-3 text-right">
                 <button onclick="reasignar('Mantenimiento Central')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md text-xs transition">
@@ -102,38 +255,110 @@
         </table>
       </div>
 
-      <!-- Pie del modal -->
       <div class="mt-6 text-right">
         <button onclick="closeModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-sm">
           Cancelar
         </button>
       </div>
-
     </div>
   </div>
 
-  <!-- CONTROL DEL MODAL CON JAVASCRIPT -->
-  <script>
-    const modal = document.getElementById('gestorModal');
+  <!-- MODAL DE AJUSTES (DONDE SÍ SE PUEDE ELIMINAR DEL SISTEMA) -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
+      <div class="flex justify-between items-center pb-4 border-b">
+        <h3 class="text-lg font-bold text-gray-800">⚙️ Ajustes del Sistema</h3>
+        <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+      </div>
 
-    function openModal() {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
+      <div class="py-4 space-y-4">
+        <p class="text-xs text-gray-500">Administración general de la plantilla de personal registrada.</p>
+        
+        <div class="border rounded-lg p-3 bg-gray-50">
+          <h4 class="text-xs font-bold text-gray-700 mb-2 uppercase">Baja definitiva de empleados</h4>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center bg-white p-2 rounded border text-xs">
+              <span>Carlos Ruiz</span>
+              <button onclick="confirmarEliminarPermanente('Carlos Ruiz')" class="text-red-600 hover:text-red-800 font-semibold text-[11px]">Eliminar del sistema</button>
+            </div>
+            <div class="flex justify-between items-center bg-white p-2 rounded border text-xs">
+              <span>Ana Torres</span>
+              <button onclick="confirmarEliminarPermanente('Ana Torres')" class="text-red-600 hover:text-red-800 font-semibold text-[11px]">Eliminar del sistema</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-right">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-sm">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script>
+    const gestorModal = document.getElementById('gestorModal');
+    const settingsModal = document.getElementById('settingsModal');
+    const notesPanel = document.getElementById('notesPanel');
+    const notesInput = document.getElementById('quickNotesInput');
+    let trabajadorSeleccionado = "";
+
+    // Cargar notas al iniciar
+    document.addEventListener("DOMContentLoaded", () => {
+      const savedNotes = localStorage.getItem('app_quick_notes');
+      if (savedNotes) notesInput.value = savedNotes;
+    });
+
+    // Toggle panel de notas
+    function toggleNotes() {
+      notesPanel.classList.toggle('hidden');
+    }
+
+    // Auto-guardado de notas en localStorage
+    function saveNotes() {
+      localStorage.setItem('app_quick_notes', notesInput.value);
+    }
+
+    // Modal de Gestión
+    function openModal(nombre, trabajoActual) {
+      trabajadorSeleccionado = nombre;
+      document.getElementById('modalNombre').innerText = nombre;
+      gestorModal.classList.remove('hidden');
+      gestorModal.classList.add('flex');
     }
 
     function closeModal() {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
+      gestorModal.classList.add('hidden');
+      gestorModal.classList.remove('flex');
     }
 
     function desvincular() {
-      alert('Trabajador movido a la Lista Principal de disponibles.');
+      alert(`${trabajadorSeleccionado} ha sido desvinculado del trabajo y enviado a la Lista Principal.`);
       closeModal();
     }
 
-    function reasignar(trabajo) {
-      alert(`Trabajador movido con éxito a: ${trabajo}`);
+    function reasignar(nuevoTrabajo) {
+      alert(`${trabajadorSeleccionado} fue transferido con éxito a: ${nuevoTrabajo}`);
       closeModal();
+    }
+
+    // Modal de Ajustes
+    function openSettingsModal() {
+      settingsModal.classList.remove('hidden');
+      settingsModal.classList.add('flex');
+    }
+
+    function closeSettingsModal() {
+      settingsModal.classList.add('hidden');
+      settingsModal.classList.remove('flex');
+    }
+
+    function confirmarEliminarPermanente(nombre) {
+      if (confirm(`¿Seguro que deseas ELIMINAR PERMANENTEMENTE a ${nombre} del sistema? Esta acción no se puede deshacer.`)) {
+        alert(`${nombre} ha sido eliminado del sistema.`);
+      }
     }
   </script>
 
