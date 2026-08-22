@@ -58,7 +58,7 @@
       <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
         <div>
           <h2 class="font-bold text-gray-800 text-lg">Resumen del Día</h2>
-          <p class="text-xs text-gray-500">Vista ordenada de trabajos, tiempos e incidencias registrada por trabajador</p>
+          <p class="text-xs text-gray-500">Vista ordenada de trabajos, tiempos exactos invertidos e incidencias</p>
         </div>
         <button onclick="exportarExcel()" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition">
           <span>📊</span> Exportar a Excel
@@ -266,11 +266,10 @@
     }
 
     function finalizarOAvanzarTrabajo(trabajo, motivo = 'Finalizado') {
-      if (!trabajo.asignadosIds || trabajo.asignadosIds.length === 0) return;
+      if (!trabajo.tiemposTrabajadores) trabajo.tiemposTrabajadores = {};
       
-      const tiempoInvertido = (trabajo.duracionMin * 60) - trabajo.tiempoRestanteSec;
-      
-      trabajo.asignadosIds.forEach(trabajadorId => {
+      (trabajo.asignadosIds || []).forEach(trabajadorId => {
+        const tiempoInvertido = trabajo.tiemposTrabajadores[trabajadorId] || 0;
         registrarTiempoEnNota(trabajadorId, trabajo.nombre, tiempoInvertido, motivo);
       });
 
@@ -325,7 +324,7 @@
         if (estaEnAlgúnTrabajoActivo) {
           delete inicioExcesoPorPersona[t.id];
         } else {
-          const estuvoEnAlgunTrabajo = trabajosHoy.some(tr => tr.asignadosIds && tr.asignadosIds.includes(t.id));
+          const estuvoEnAlgunTrabajo = trabajosHoy.some(tr => tr.historialAsignados && tr.historialAsignados.includes(t.id));
           if (estuvoEnAlgunTrabajo) {
             if (!inicioExcesoPorPersona[t.id]) {
               inicioExcesoPorPersona[t.id] = ahora;
@@ -349,7 +348,7 @@
         const trabajosHoy = obtenerTrabajosDelDiaActual();
 
         trabajosHoy.forEach(tr => {
-          if (!tr.asignadosIds || tr.asignadosIds.length === 0) return;
+          if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
 
           if (tr.enPausa30) {
             cambiado = true;
@@ -364,6 +363,12 @@
           else if (tr.activo && tr.tiempoRestanteSec > 0) {
             tr.tiempoRestanteSec--;
             cambiado = true;
+
+            // Sumar tiempo individual exacto a cada trabajador asignado activo
+            (tr.asignadosIds || []).forEach(tId => {
+              tr.tiemposTrabajadores[tId] = (tr.tiemposTrabajadores[tId] || 0) + 1;
+            });
+
             if (tr.tiempoRestanteSec === 0) {
               finalizarOAvanzarTrabajo(tr, 'Tiempo agotado 100%');
             }
@@ -372,9 +377,11 @@
 
         actualizarTiemposExceso();
 
-        guardarDatos();
-        renderTrabajos();
-        renderResumenDia();
+        if (cambiado) {
+          guardarDatos();
+          renderTrabajos();
+          renderResumenDia();
+        }
       }, 1000);
     }
 
@@ -397,6 +404,7 @@
 
       contenedor.innerHTML = trabajosHoy.map(tr => {
         if (!tr.asignadosIds) tr.asignadosIds = [];
+        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
         if (tr.enPausa30 === undefined) tr.enPausa30 = false;
         if (tr.tiempoPausa30Sec === undefined) tr.tiempoPausa30Sec = 30 * 60;
 
@@ -498,17 +506,22 @@
       }
 
       contenedor.innerHTML = trabajosHoy.map(tr => {
-        const integrantes = (tr.asignadosIds || []).map(id => trabajadores.find(t => t.id === id)).filter(Boolean);
+        if (!tr.historialAsignados) tr.historialAsignados = tr.asignadosIds || [];
+        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
 
-        const desgloseTrabajadores = integrantes.length > 0
-          ? integrantes.map(t => {
+        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || [])]))
+          .map(id => trabajadores.find(t => t.id === id))
+          .filter(Boolean);
+
+        const desgloseTrabajadores = todosLosInvolucrados.length > 0
+          ? todosLosInvolucrados.map(t => {
               const notas = obsDia[t.id] || 'Sin notas registradas';
-              const tiempoInvertido = (tr.duracionMin * 60) - tr.tiempoRestanteSec;
+              const tiempoInvertidoSec = tr.tiemposTrabajadores[t.id] || 0;
               return `
                 <div class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-1">
                   <div class="flex justify-between font-semibold text-gray-800">
                     <span>👤 ${t.nombre}</span>
-                    <span class="text-indigo-600">⏱️ Tiempo asignado/invertido: ${formatearTiempo(tiempoInvertido)} / ${tr.duracionMin}m</span>
+                    <span class="text-indigo-600">⏱️ Tiempo real trabajado: ${formatearTiempo(tiempoInvertidoSec)}</span>
                   </div>
                   <div class="text-gray-600 italic text-[11px] bg-white p-2 rounded border border-gray-100">
                     📝 ${notas}
@@ -516,7 +529,7 @@
                 </div>
               `;
             }).join('')
-          : `<p class="text-xs text-gray-400 italic">Sin trabajadores asignados a este trabajo.</p>`;
+          : `<p class="text-xs text-gray-400 italic">Sin trabajadores registrados en este trabajo.</p>`;
 
         return `
           <div class="border border-gray-200 rounded-lg p-3 bg-gray-50/30">
@@ -545,19 +558,25 @@
         return;
       }
 
-      let csvContent = "\uFEFF"; // BOM para acentos en Excel
-      csvContent += "Fecha;Trabajo;Observaciones Trabajo;Trabajador;Tiempo Invertido;Notas y Registro con Hora\n";
+      let csvContent = "\uFEFF"; 
+      csvContent += "Fecha;Trabajo;Observaciones Trabajo;Trabajador;Tiempo Real Trabajado;Notas y Registro con Hora\n";
 
       trabajosHoy.forEach(tr => {
-        const integrantes = (tr.asignadosIds || []).map(id => trabajadores.find(t => t.id === id)).filter(Boolean);
+        if (!tr.historialAsignados) tr.historialAsignados = tr.asignadosIds || [];
+        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+
+        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || [])]))
+          .map(id => trabajadores.find(t => t.id === id))
+          .filter(Boolean);
+
         const obsTrabajoClean = (tr.obs || '').replace(/;/g, ',').replace(/\n/g, ' ');
 
-        if (integrantes.length === 0) {
+        if (todosLosInvolucrados.length === 0) {
           csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"Sin asignar";"0m";""\n`;
         } else {
-          integrantes.forEach(t => {
-            const tiempoInvertido = (tr.duracionMin * 60) - tr.tiempoRestanteSec;
-            const tiempoTexto = formatearTiempo(tiempoInvertido);
+          todosLosInvolucrados.forEach(t => {
+            const tiempoInvertidoSec = tr.tiemposTrabajadores[t.id] || 0;
+            const tiempoTexto = formatearTiempo(tiempoInvertidoSec);
             const notasClean = (obsDia[t.id] || '').replace(/;/g, ',').replace(/\n/g, ' ');
             
             csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"${t.nombre}";"${tiempoTexto}";"${notasClean}"\n`;
@@ -675,12 +694,16 @@
       const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
 
       if (tr && tr.asignadosIds) {
-        const tiempoInvertido = (tr.duracionMin * 60) - tr.tiempoRestanteSec;
+        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+        const tiempoInvertido = tr.tiemposTrabajadores[seleccionadoId] || 0;
+        
         registrarTiempoEnNota(seleccionadoId, tr.nombre, tiempoInvertido, 'Desvinculado');
         tr.asignadosIds = tr.asignadosIds.filter(id => id !== seleccionadoId);
         
         guardarDatos();
         closeObsPersonaModal();
+        renderTrabajos();
+        renderResumenDia();
       }
     }
 
@@ -693,8 +716,8 @@
         tr.activo = !tr.activo;
 
         if (!tr.activo) {
-          const tiempoInvertido = (tr.duracionMin * 60) - tr.tiempoRestanteSec;
-          tr.asignadosIds.forEach(trabajadorId => {
+          (tr.asignadosIds || []).forEach(trabajadorId => {
+            const tiempoInvertido = (tr.tiemposTrabajadores && tr.tiemposTrabajadores[trabajadorId]) || 0;
             registrarTiempoEnNota(trabajadorId, tr.nombre, tiempoInvertido, 'Pausado manualmente');
           });
         }
@@ -735,7 +758,7 @@
       const tr = trabajosHoy.find(x => x.id === id);
       if (!tr) return;
 
-      if (confirm(`¿Finalizar el trabajo "${tr.nombre}"? Se guardará el tiempo en el registro de todos los asignados.`)) {
+      if (confirm(`¿Finalizar el trabajo "${tr.nombre}"? Se guardará el tiempo exacto trabajado por cada asignado.`)) {
         finalizarOAvanzarTrabajo(tr, 'Finalizado por usuario');
         guardarDatos();
         renderTrabajos();
@@ -783,6 +806,10 @@
 
       if (tr) {
         tr.asignadosIds = seleccionadosIds;
+
+        if (!tr.historialAsignados) tr.historialAsignados = [];
+        tr.historialAsignados = Array.from(new Set([...tr.historialAsignados, ...seleccionadosIds]));
+
         if (tr.asignadosIds.length > 0 && tr.tiempoRestanteSec === 0) {
           tr.tiempoRestanteSec = tr.duracionMin * 60;
         }
@@ -847,7 +874,9 @@
             enPausa30: false,
             tiempoPausa30Sec: 30 * 60,
             obs: "",
-            asignadosIds: []
+            asignadosIds: [],
+            historialAsignados: [],
+            tiemposTrabajadores: {}
           });
         }
       });
