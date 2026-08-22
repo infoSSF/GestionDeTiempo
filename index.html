@@ -46,7 +46,7 @@
     </div>
   </header>
 
-  <!-- CONTENEDOR PRINCIPAL (PANTALLA COMPLETA PARA TRABAJOS) -->
+  <!-- CONTENEDOR PRINCIPAL -->
   <main class="max-w-5xl mx-auto space-y-6">
     <div>
       <h2 class="font-bold text-gray-800 text-lg flex items-center gap-2 mb-4">Trabajos Programados para el Día</h2>
@@ -58,7 +58,7 @@
       <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
         <div>
           <h2 class="font-bold text-gray-800 text-lg">Resumen del Día</h2>
-          <p class="text-xs text-gray-500">Vista ordenada de trabajos, tiempos exactos invertidos e incidencias</p>
+          <p class="text-xs text-gray-500">Histórico completo e imborrable de asignaciones, tiempos reales e incidencias</p>
         </div>
         <button onclick="exportarExcel()" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition">
           <span>📊</span> Exportar a Excel
@@ -81,7 +81,7 @@
 
       <div class="my-4">
         <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Observaciones Generales de este Trabajo:</label>
-        <textarea id="obsTrabajoInput" oninput="autoGuardarObsTrabajo()" rows="5" placeholder="Escribe notas, incidencias o detalles del trabajo aquí... (se guarda automáticamente)" class="w-full p-3 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+        <textarea id="obsTrabajoInput" oninput="autoGuardarObsTrabajo()" rows="5" placeholder="Escribe notas, incidencias o detalles del trabajo aquí..." class="w-full p-3 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
       </div>
 
       <div class="text-right border-t pt-3">
@@ -102,9 +102,9 @@
       </div>
 
       <div class="my-3 p-3 bg-red-50 border border-red-200 rounded-lg flex justify-between items-center">
-        <span class="text-xs text-red-800 font-semibold">¿Quitar a esta persona de este trabajo?</span>
+        <span class="text-xs text-red-800 font-semibold">¿Desvincular de este trabajo? (Se conservará su tiempo invertido)</span>
         <button onclick="desvincularPersonaActual()" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition">
-          ✕ Desvincular Trabajo
+          ✕ Desvincular
         </button>
       </div>
 
@@ -131,7 +131,7 @@
         <h3 class="text-base font-bold text-gray-800">Añadir Personal a: <span id="modalTrabajoVincularNombre" class="text-indigo-600">--</span></h3>
         <button onclick="closeVincularModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
       </div>
-      <p class="text-xs text-gray-500 my-3">Selecciona los trabajadores asignados a este trabajo.</p>
+      <p class="text-xs text-gray-500 my-3">Selecciona o quita los trabajadores asignados a este trabajo.</p>
 
       <div id="listaCheckPersonalVincular" class="space-y-2 my-4 max-h-60 overflow-y-auto border border-gray-200 p-3 rounded-lg"></div>
 
@@ -260,15 +260,19 @@
 
       if (!obsDia[trabajadorId]) {
         obsDia[trabajadorId] = textoReg;
-      } else {
+      } else if (!obsDia[trabajadorId].includes(textoReg)) {
         obsDia[trabajadorId] += ` | ${textoReg}`;
       }
     }
 
     function finalizarOAvanzarTrabajo(trabajo, motivo = 'Finalizado') {
       if (!trabajo.tiemposTrabajadores) trabajo.tiemposTrabajadores = {};
+      if (!trabajo.historialAsignados) trabajo.historialAsignados = [];
       
       (trabajo.asignadosIds || []).forEach(trabajadorId => {
+        if (!trabajo.historialAsignados.includes(trabajadorId)) {
+          trabajo.historialAsignados.push(trabajadorId);
+        }
         const tiempoInvertido = trabajo.tiemposTrabajadores[trabajadorId] || 0;
         registrarTiempoEnNota(trabajadorId, trabajo.nombre, tiempoInvertido, motivo);
       });
@@ -277,6 +281,7 @@
       trabajo.tiempoPausa30Sec = 30 * 60;
       trabajo.tiempoRestanteSec = 0;
       trabajo.activo = false;
+      trabajo.iniciadoAlgunaVez = true;
     }
 
     function iniciarTodosLosTrabajos() {
@@ -287,6 +292,7 @@
         if (tr.asignadosIds && tr.asignadosIds.length > 0 && tr.tiempoRestanteSec > 0) {
           tr.activo = true;
           tr.enPausa30 = false;
+          tr.iniciadoAlgunaVez = true;
           arrancado = true;
         }
       });
@@ -317,18 +323,25 @@
       const ahora = Date.now();
 
       trabajadores.forEach(t => {
-        const estaEnAlgúnTrabajoActivo = trabajosHoy.some(tr => 
-          tr.activo && tr.asignadosIds && tr.asignadosIds.includes(t.id)
+        // Verificar si está activamente trabajando o en pausa de 30 min
+        const estaEnTrabajoActivoOPausa = trabajosHoy.some(tr => 
+          (tr.activo || tr.enPausa30) && tr.asignadosIds && tr.asignadosIds.includes(t.id)
         );
 
-        if (estaEnAlgúnTrabajoActivo) {
+        if (estaEnTrabajoActivoOPausa) {
           delete inicioExcesoPorPersona[t.id];
         } else {
-          const estuvoEnAlgunTrabajo = trabajosHoy.some(tr => tr.historialAsignados && tr.historialAsignados.includes(t.id));
-          if (estuvoEnAlgunTrabajo) {
+          // SOLO cuenta exceso si ya ha participado previamente en un trabajo que haya iniciado alguna vez
+          const haTrabajadoPreviamente = trabajosHoy.some(tr => 
+            tr.iniciadoAlgunaVez && tr.historialAsignados && tr.historialAsignados.includes(t.id)
+          );
+
+          if (haTrabajadoPreviamente) {
             if (!inicioExcesoPorPersona[t.id]) {
               inicioExcesoPorPersona[t.id] = ahora;
             }
+          } else {
+            delete inicioExcesoPorPersona[t.id];
           }
         }
       });
@@ -364,7 +377,6 @@
             tr.tiempoRestanteSec--;
             cambiado = true;
 
-            // Sumar tiempo individual exacto a cada trabajador asignado activo
             (tr.asignadosIds || []).forEach(tId => {
               tr.tiemposTrabajadores[tId] = (tr.tiemposTrabajadores[tId] || 0) + 1;
             });
@@ -404,6 +416,7 @@
 
       contenedor.innerHTML = trabajosHoy.map(tr => {
         if (!tr.asignadosIds) tr.asignadosIds = [];
+        if (!tr.historialAsignados) tr.historialAsignados = [];
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
         if (tr.enPausa30 === undefined) tr.enPausa30 = false;
         if (tr.tiempoPausa30Sec === undefined) tr.tiempoPausa30Sec = 30 * 60;
@@ -506,10 +519,12 @@
       }
 
       contenedor.innerHTML = trabajosHoy.map(tr => {
-        if (!tr.historialAsignados) tr.historialAsignados = tr.asignadosIds || [];
+        if (!tr.historialAsignados) tr.historialAsignados = [];
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
 
-        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || [])]))
+        // INCLUIR TANTO ASIGNADOS ACTUALES COMO HISTÓRICOS QUE HAYAN REGISTRADO TIEMPO
+        const trabajadoresConTiempo = Object.keys(tr.tiemposTrabajadores).map(id => parseInt(id));
+        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || []), ...trabajadoresConTiempo]))
           .map(id => trabajadores.find(t => t.id === id))
           .filter(Boolean);
 
@@ -517,10 +532,12 @@
           ? todosLosInvolucrados.map(t => {
               const notas = obsDia[t.id] || 'Sin notas registradas';
               const tiempoInvertidoSec = tr.tiemposTrabajadores[t.id] || 0;
+              const esActual = (tr.asignadosIds || []).includes(t.id);
+
               return `
                 <div class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-1">
                   <div class="flex justify-between font-semibold text-gray-800">
-                    <span>👤 ${t.nombre}</span>
+                    <span>👤 ${t.nombre} ${!esActual ? '<span class="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 font-normal ml-1">Desvinculado / Cambiado</span>' : ''}</span>
                     <span class="text-indigo-600">⏱️ Tiempo real trabajado: ${formatearTiempo(tiempoInvertidoSec)}</span>
                   </div>
                   <div class="text-gray-600 italic text-[11px] bg-white p-2 rounded border border-gray-100">
@@ -559,27 +576,29 @@
       }
 
       let csvContent = "\uFEFF"; 
-      csvContent += "Fecha;Trabajo;Observaciones Trabajo;Trabajador;Tiempo Real Trabajado;Notas y Registro con Hora\n";
+      csvContent += "Fecha;Trabajo;Observaciones Trabajo;Trabajador;Estado Asignación;Tiempo Real Trabajado;Notas y Registro con Hora\n";
 
       trabajosHoy.forEach(tr => {
-        if (!tr.historialAsignados) tr.historialAsignados = tr.asignadosIds || [];
+        if (!tr.historialAsignados) tr.historialAsignados = [];
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
 
-        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || [])]))
+        const trabajadoresConTiempo = Object.keys(tr.tiemposTrabajadores).map(id => parseInt(id));
+        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || []), ...trabajadoresConTiempo]))
           .map(id => trabajadores.find(t => t.id === id))
           .filter(Boolean);
 
         const obsTrabajoClean = (tr.obs || '').replace(/;/g, ',').replace(/\n/g, ' ');
 
         if (todosLosInvolucrados.length === 0) {
-          csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"Sin asignar";"0m";""\n`;
+          csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"Sin asignar";"-";"0m";""\n`;
         } else {
           todosLosInvolucrados.forEach(t => {
             const tiempoInvertidoSec = tr.tiemposTrabajadores[t.id] || 0;
             const tiempoTexto = formatearTiempo(tiempoInvertidoSec);
             const notasClean = (obsDia[t.id] || '').replace(/;/g, ',').replace(/\n/g, ' ');
+            const estadoAsig = (tr.asignadosIds || []).includes(t.id) ? "Activo" : "Desvinculado / Cambiado";
             
-            csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"${t.nombre}";"${tiempoTexto}";"${notasClean}"\n`;
+            csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"${t.nombre}";"${estadoAsig}";"${tiempoTexto}";"${notasClean}"\n`;
           });
         }
       });
@@ -695,6 +714,12 @@
 
       if (tr && tr.asignadosIds) {
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+        if (!tr.historialAsignados) tr.historialAsignados = [];
+
+        if (!tr.historialAsignados.includes(seleccionadoId)) {
+          tr.historialAsignados.push(seleccionadoId);
+        }
+
         const tiempoInvertido = tr.tiemposTrabajadores[seleccionadoId] || 0;
         
         registrarTiempoEnNota(seleccionadoId, tr.nombre, tiempoInvertido, 'Desvinculado');
@@ -714,6 +739,9 @@
       if (tr && tr.asignadosIds && tr.asignadosIds.length > 0) {
         tr.enPausa30 = false;
         tr.activo = !tr.activo;
+        if (tr.activo) {
+          tr.iniciadoAlgunaVez = true;
+        }
 
         if (!tr.activo) {
           (tr.asignadosIds || []).forEach(trabajadorId => {
@@ -805,9 +833,21 @@
       const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
 
       if (tr) {
-        tr.asignadosIds = seleccionadosIds;
-
         if (!tr.historialAsignados) tr.historialAsignados = [];
+        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+
+        // Guardar en el historial a los desvinculados para no perder su registro
+        tr.asignadosIds.forEach(idViejo => {
+          if (!seleccionadosIds.includes(idViejo)) {
+            if (!tr.historialAsignados.includes(idViejo)) {
+              tr.historialAsignados.push(idViejo);
+            }
+            const tInvertido = tr.tiemposTrabajadores[idViejo] || 0;
+            registrarTiempoEnNota(idViejo, tr.nombre, tInvertido, 'Cambiado/Desvinculado');
+          }
+        });
+
+        tr.asignadosIds = seleccionadosIds;
         tr.historialAsignados = Array.from(new Set([...tr.historialAsignados, ...seleccionadosIds]));
 
         if (tr.asignadosIds.length > 0 && tr.tiempoRestanteSec === 0) {
@@ -873,6 +913,7 @@
             activo: false,
             enPausa30: false,
             tiempoPausa30Sec: 30 * 60,
+            iniciadoAlgunaVez: false,
             obs: "",
             asignadosIds: [],
             historialAsignados: [],
