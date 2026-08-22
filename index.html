@@ -27,7 +27,7 @@
         body {
             background-color: var(--bg-color);
             color: var(--text-main);
-            padding: 20px;
+            padding: 24px;
         }
 
         header {
@@ -62,7 +62,7 @@
 
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 300px;
+            grid-template-columns: 1fr 320px;
             gap: 24px;
         }
 
@@ -148,7 +148,7 @@
             border-radius: 6px;
             font-size: 0.95rem;
         }
-        .form-group textarea { resize: vertical; height: 80px; }
+        .form-group textarea { resize: vertical; height: 90px; }
 
         .modal-actions {
             display: flex;
@@ -186,8 +186,8 @@
 
     <header>
         <h1>Planificador Diario</h1>
-        <div>
-            <button class="btn btn-secondary" onclick="openSettingsModal()">⚙️ Ajustes / Base de Datos</button>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="openSettingsModal()">⚙️ Ajustes</button>
             <button class="btn" onclick="openAssignModal()">+ Asignar Trabajador</button>
         </div>
     </header>
@@ -206,7 +206,7 @@
             <div class="card">
                 <h2>Resumen Diario</h2>
                 <div id="daily-summary">
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">Sin actividad registrada hoy.</p>
+                    <!-- Se llena dinámicamente -->
                 </div>
             </div>
         </div>
@@ -237,9 +237,7 @@
             <h3 id="obs-title">Observaciones</h3>
             <div class="form-group">
                 <label>Notas Rápidas (Haz clic para insertar):</label>
-                <div class="quick-notes-container" id="modal-quick-notes">
-                    <!-- Notas rápidas configuradas en ajustes -->
-                </div>
+                <div class="quick-notes-container" id="modal-quick-notes"></div>
             </div>
             <div class="form-group">
                 <label for="obs-text">Detalle / Observación:</label>
@@ -254,22 +252,20 @@
 
     <!-- MODAL: Reasignación ("X") -->
     <div class="modal-overlay" id="modal-reassign">
-        <div class="modal" style="max-width: 600px;">
+        <div class="modal" style="max-width: 650px;">
             <h3 id="reassign-worker-title">Gestionar Trabajador</h3>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">Trabajos activos y opciones de reasignación:</p>
-            <div id="reassign-details-container">
-                <!-- Tabla detallada de trabajos y personas -->
-            </div>
+            <div id="reassign-details-container"></div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModals()">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: Ajustes / Base de Datos (Gestión en bruto) -->
+    <!-- MODAL: Ajustes / Base de Datos -->
     <div class="modal-overlay" id="modal-settings">
-        <div class="modal" style="max-width: 650px;">
-            <h3>Ajustes de Datos (Trabajadores, Trabajos y Notas)</h3>
+        <div class="modal" style="max-width: 700px;">
+            <h3>Ajustes de Datos (Trabajadores, Trabajos y Notas Rápidas)</h3>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
                 <div class="form-group">
@@ -307,35 +303,27 @@
     </div>
 
     <script>
-        // DATOS INICIALES VACÍOS (Parten de cero)
+        // ESTRUCTURA BASE VACÍA (Partes de cero sin datos inventados)
         let db = {
             workers: [],
             jobs: [],
             quickNotes: [],
-            assignments: [], // { worker: 'Nombre', job: 'Trabajo', observation: '' }
+            assignments: [] 
         };
 
-        // Cargar desde localStorage si existe, sino arranca vacío
         function loadData() {
-            const saved = localStorage.getItem('planner_db_v2');
+            const saved = localStorage.getItem('planner_db_v3');
             if (saved) {
                 db = JSON.parse(saved);
             } else {
-                // Datos base totalmente limpios o vacíos (puedes dejarlos vacíos)
-                db = {
-                    workers: [],
-                    jobs: [],
-                    quickNotes: [],
-                    assignments: []
-                };
+                db = { workers: [], jobs: [], quickNotes: [], assignments: [] };
             }
         }
 
         function saveData() {
-            localStorage.setItem('planner_db_v2', JSON.stringify(db));
+            localStorage.setItem('planner_db_v3', JSON.stringify(db));
         }
 
-        // Renderizado principal
         function render() {
             renderAssignmentsTable();
             renderSummary();
@@ -344,7 +332,7 @@
         function renderAssignmentsTable() {
             const container = document.getElementById('assignments-table-container');
             if (db.assignments.length === 0) {
-                container.innerHTML = `<div class="empty-state">No hay trabajadores asignados hoy. Pulsa en "+ Asignar Trabajador" o configura tus datos en "⚙️ Ajustes".</div>`;
+                container.innerHTML = `<div class="empty-state">No hay trabajadores asignados hoy.<br>Configura tus datos en <strong>⚙️ Ajustes</strong> y añade asignaciones con <strong>+ Asignar Trabajador</strong>.</div>`;
                 return;
             }
 
@@ -361,7 +349,7 @@
                     <tbody>
             `;
 
-            db.assignments.forEach((assign, index) => {
+            db.assignments.forEach((assign) => {
                 html += `
                     <tr>
                         <td><span class="worker-name" onclick="openObservationModal('${assign.worker}')">${assign.worker}</span></td>
@@ -387,7 +375,6 @@
             container.innerHTML = `<p style="font-size: 0.95rem; font-weight: 500;">Total asignaciones activas: <strong>${db.assignments.length}</strong></p>`;
         }
 
-        // Modales y Controles
         function closeModals() {
             document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
             render();
@@ -413,10 +400,9 @@
             const worker = document.getElementById('select-worker').value;
             const job = document.getElementById('select-job').value;
 
-            // Verificar si ya está asignado
             const existing = db.assignments.find(a => a.worker === worker);
             if(existing) {
-                existing.job = job; // Actualizar trabajo si ya existe
+                existing.job = job; 
             } else {
                 db.assignments.push({ worker, job, observation: '' });
             }
@@ -425,7 +411,6 @@
             closeModals();
         }
 
-        // Observaciones
         let currentWorkerObs = null;
         function openObservationModal(workerName) {
             currentWorkerObs = workerName;
@@ -434,7 +419,6 @@
             const currentObj = db.assignments.find(a => a.worker === workerName);
             document.getElementById('obs-text').value = currentObj ? currentObj.observation : '';
 
-            // Cargar notas rápidas en chips
             const qContainer = document.getElementById('modal-quick-notes');
             if(db.quickNotes.length === 0) {
                 qContainer.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted);">No hay notas rápidas configuradas en Ajustes.</span>`;
@@ -467,12 +451,10 @@
             closeModals();
         }
 
-        // Modal "X" (Reasignación detallada por grupos de trabajos)
         function openReassignModal(workerName) {
             document.getElementById('reassign-worker-title').innerText = `Gestionar a: ${workerName}`;
             const container = document.getElementById('reassign-details-container');
 
-            // Agrupar por trabajos actuales para mostrar tabla de personas asignadas
             let html = `
                 <table>
                     <thead>
@@ -486,26 +468,30 @@
                     <tbody>
             `;
 
-            db.jobs.forEach(job => {
-                const assignedWorkers = db.assignments.filter(a => a.job === job).map(a => a.worker);
-                const isCurrentWorkerInJob = assignedWorkers.includes(workerName);
+            if(db.jobs.length === 0) {
+                html += `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No hay trabajos registrados.</td></tr>`;
+            } else {
+                db.jobs.forEach(job => {
+                    const assignedWorkers = db.assignments.filter(a => a.job === job).map(a => a.worker);
+                    const isCurrentWorkerInJob = assignedWorkers.includes(workerName);
 
-                html += `
-                    <tr>
-                        <td><strong>${job}</strong></td>
-                        <td style="font-size: 0.85rem; color: var(--text-muted);">${assignedWorkers.join(', ') || 'Ninguno'}</td>
-                        <td>${assignedWorkers.length}</td>
-                        <td style="text-align: right;">
-                `;
+                    html += `
+                        <tr>
+                            <td><strong>${job}</strong></td>
+                            <td style="font-size: 0.85rem; color: var(--text-muted);">${assignedWorkers.join(', ') || 'Ninguno'}</td>
+                            <td>${assignedWorkers.length}</td>
+                            <td style="text-align: right;">
+                    `;
 
-                if(isCurrentWorkerInJob) {
-                    html += `<button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="unassignWorkerFromJob('${workerName}')">Desvincular</button>`;
-                } else {
-                    html += `<button class="btn" style="padding: 4px 8px; font-size: 0.75rem;" onclick="moveWorkerToJob('${workerName}', '${job}')">Mover aquí</button>`;
-                }
+                    if(isCurrentWorkerInJob) {
+                        html += `<button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="unassignWorkerFromJob('${workerName}')">Desvincular</button>`;
+                    } else {
+                        html += `<button class="btn" style="padding: 4px 8px; font-size: 0.75rem;" onclick="moveWorkerToJob('${workerName}', '${job}')">Mover aquí</button>`;
+                    }
 
-                html += `</td></tr>`;
-            });
+                    html += `</td></tr>`;
+                });
+            }
 
             html += `</tbody></table>`;
             container.innerHTML = html;
@@ -529,14 +515,12 @@
             closeModals();
         }
 
-        // Ajustes / Base de Datos
         function openSettingsModal() {
             renderSettingsLists();
             document.getElementById('modal-settings').classList.add('active');
         }
 
         function renderSettingsLists() {
-            // Trabajadores
             const wList = document.getElementById('settings-workers-list');
             wList.innerHTML = db.workers.length ? db.workers.map((w, i) => `
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; padding: 2px 0;">
@@ -545,7 +529,6 @@
                 </div>
             `).join('') : '<span style="font-size:0.8rem; color:var(--text-muted);">Sin trabajadores registrados.</span>';
 
-            // Trabajos
             const jList = document.getElementById('settings-jobs-list');
             jList.innerHTML = db.jobs.length ? db.jobs.map((j, i) => `
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; padding: 2px 0;">
@@ -554,7 +537,6 @@
                 </div>
             `).join('') : '<span style="font-size:0.8rem; color:var(--text-muted);">Sin trabajos registrados.</span>';
 
-            // Notas Rápidas
             const qList = document.getElementById('settings-qnotes-list');
             qList.innerHTML = db.quickNotes.length ? db.quickNotes.map((q, i) => `
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; padding: 2px 0;">
@@ -619,7 +601,7 @@
             renderSettingsLists();
         }
 
-        // Inicialización
+        // Inicializar
         loadData();
         render();
     </script>
