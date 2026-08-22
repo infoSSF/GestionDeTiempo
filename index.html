@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Trabajos y Jornada</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Librería EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+
+  <nav class="bg-blue-700 text-white p-4 flex gap-4 font-semibold shadow-md overflow-x-auto">
+    <button onclick="verPantalla('nuevoDia')" class="hover:underline whitespace-nowrap">Iniciar Día</button>
+    <button onclick="verPantalla('historial')" class="hover:underline whitespace-nowrap">Historial</button>
+    <button onclick="verPantalla('comentarios')" class="hover:underline whitespace-nowrap">Comentarios Rápidos</button>
+    <button onclick="verPantalla('ajustes')" class="hover:underline whitespace-nowrap">Ajustes</button>
+  </nav>
+
+  <main class="p-6 max-w-4xl mx-auto">
+
+    <!-- INICIAR NUEVO DÍA -->
+    <section id="nuevoDia" class="pantalla">
+      <h1 class="text-2xl font-bold mb-4">Iniciar Nuevo Día</h1>
+      <div class="bg-white p-6 rounded shadow space-y-4">
+        <div>
+          <label class="block font-medium mb-1">Fecha:</label>
+          <input type="date" id="fechaDia" class="border p-2 rounded w-full">
+        </div>
+        <div>
+          <label class="block font-medium mb-1">Seleccionar Trabajo:</label>
+          <select id="selectTrabajo" class="border p-2 rounded w-full"></select>
+        </div>
+        <div>
+          <label class="block font-medium mb-1">Seleccionar Trabajador(es):</label>
+          <div id="listaTrabajadoresCheck" class="border p-3 rounded max-h-40 overflow-y-auto space-y-1"></div>
+        </div>
+        <div>
+          <label class="block font-medium mb-1">Observaciones:</label>
+          <textarea id="obsDia" class="border p-2 rounded w-full" rows="2" placeholder="Notas sobre el trabajo o personal..."></textarea>
+        </div>
+        
+        <button onclick="iniciarContador()" class="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700">
+          Iniciar Trabajo
+        </button>
+
+        <!-- Reloj / Cuenta atrás -->
+        <div id="panelTimer" class="hidden border-t pt-4 mt-4">
+          <p class="text-lg font-semibold">Trabajo en curso: <span id="timerMinutos" class="text-2xl font-bold text-blue-600">00:00</span></p>
+          <button onclick="finalizarTrabajo()" class="bg-red-600 text-white px-4 py-2 rounded mt-2 font-bold hover:bg-red-700">
+            Finalizar Trabajo y Guardar
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORIAL -->
+    <section id="historial" class="pantalla hidden">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <h1 class="text-2xl font-bold">Historial de Registros</h1>
+        <div class="flex gap-2">
+          <button onclick="exportarExcel()" class="bg-emerald-600 text-white px-4 py-2 rounded font-bold hover:bg-emerald-700">
+            Descargar Excel
+          </button>
+          <button onclick="abrirModalEmail()" class="bg-indigo-600 text-white px-4 py-2 rounded font-bold hover:bg-indigo-700">
+            Enviar Correo
+          </button>
+        </div>
+      </div>
+      <div class="bg-white p-6 rounded shadow overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b bg-gray-50">
+              <th class="p-2">Fecha</th>
+              <th class="p-2">Trabajo</th>
+              <th class="p-2">Trabajadores</th>
+              <th class="p-2">Tiempo Teórico</th>
+              <th class="p-2">Observaciones</th>
+            </tr>
+          </thead>
+          <tbody id="tablaHistorial"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- COMENTARIOS RÁPIDOS -->
+    <section id="comentarios" class="pantalla hidden">
+      <h1 class="text-2xl font-bold mb-4">Comentarios Rápidos por Trabajador</h1>
+      <div class="bg-white p-6 rounded shadow space-y-4">
+        <div>
+          <label class="block font-medium mb-1">Trabajador:</label>
+          <select id="selectTrabajadorComentario" class="border p-2 rounded w-full"></select>
+        </div>
+        <div>
+          <label class="block font-medium mb-1">Comentario:</label>
+          <textarea id="textoComentario" class="border p-2 rounded w-full" rows="3" placeholder="Nota rápida..."></textarea>
+        </div>
+        <button onclick="guardarComentario()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">
+          Guardar Comentario
+        </button>
+      </div>
+      <div id="listaComentarios" class="mt-6 space-y-2"></div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section id="ajustes" class="pantalla hidden">
+      <h1 class="text-2xl font-bold mb-4">Configuración y Gestión</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Gestión Trabajos -->
+        <div class="bg-white p-6 rounded shadow">
+          <h2 class="text-xl font-bold mb-3">Trabajos</h2>
+          <div class="space-y-2 mb-4">
+            <input type="text" id="nombreTrabajo" placeholder="Nombre del trabajo" class="border p-2 rounded w-full">
+            <input type="number" id="tiempoTrabajo" placeholder="Tiempo teórico (minutos)" class="border p-2 rounded w-full">
+            <button onclick="addTrabajo()" class="bg-blue-600 text-white w-full py-2 rounded font-bold hover:bg-blue-700">Añadir Trabajo</button>
+          </div>
+          <ul id="listaTrabajos" class="divide-y"></ul>
+        </div>
+
+        <!-- Gestión Trabajadores -->
+        <div class="bg-white p-6 rounded shadow">
+          <h2 class="text-xl font-bold mb-3">Trabajadores</h2>
+          <div class="space-y-2 mb-4">
+            <input type="text" id="nombreTrabajador" placeholder="Nombre completo" class="border p-2 rounded w-full">
+            <button onclick="addTrabajador()" class="bg-blue-600 text-white w-full py-2 rounded font-bold hover:bg-blue-700">Añadir Trabajador</button>
+          </div>
+          <ul id="listaTrabajadores" class="divide-y"></ul>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL ENVÍO CORREO -->
+  <div id="modalEmail" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white p-6 rounded-lg max-w-md w-full space-y-4">
+      <h2 class="text-xl font-bold">Enviar Reporte del Día</h2>
+      <div>
+        <label class="block text-sm font-medium mb-1">Correo de destino:</label>
+        <input type="email" id="emailDestino" placeholder="ejemplo@correo.com" class="border p-2 rounded w-full">
+      </div>
+      <div class="flex flex-col gap-2">
+        <button onclick="enviarCorreoEmailJS()" class="bg-indigo-600 text-white py-2 rounded font-bold hover:bg-indigo-700">
+          Enviar Resumen por Email (Automático)
+        </button>
+        <button onclick="abrirClienteMail()" class="bg-gray-200 text-gray-800 py-2 rounded font-bold hover:bg-gray-300">
+          Abrir App de Correo (Adjuntar Excel manualmente)
+        </button>
+        <button onclick="cerrarModalEmail()" class="text-red-600 mt-2 hover:underline text-sm">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Configuración Inicial de EmailJS (Opcional - reemplaza con tus claves de emailjs.com)
+    (function(){
+      emailjs.init("TU_PUBLIC_KEY_AQUI");
+    })();
+
+    let DB = JSON.parse(localStorage.getItem('appData')) || {
+      trabajos: [],
+      trabajadores: [],
+      registros: [],
+      comentarios: []
+    };
+
+    let timerId = null;
+    let trabajoActivo = null;
+
+    function guardarDB() {
+      localStorage.setItem('appData', JSON.stringify(DB));
+      cargarAjustes();
+      cargarFormularioDia();
+    }
+
+    function verPantalla(id) {
+      document.querySelectorAll('.pantalla').forEach(p => p.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      if(id === 'historial') cargarHistorial();
+      if(id === 'comentarios') cargarComentarios();
+    }
+
+    document.getElementById('fechaDia').valueAsDate = new Date();
+
+    // --- AJUSTES ---
+    function addTrabajo() {
+      const nombre = document.getElementById('nombreTrabajo').value.trim();
+      const tiempo = parseInt(document.getElementById('tiempoTrabajo').value);
+      if(nombre && tiempo) {
+        DB.trabajos.push({ id: Date.now(), nombre, tiempo });
+        document.getElementById('nombreTrabajo').value = '';
+        document.getElementById('tiempoTrabajo').value = '';
+        guardarDB();
+      }
+    }
+
+    function delTrabajo(id) {
+      DB.trabajos = DB.trabajos.filter(t => t.id !== id);
+      guardarDB();
+    }
+
+    function addTrabajador() {
+      const nombre = document.getElementById('nombreTrabajador').value.trim();
+      if(nombre) {
+        DB.trabajadores.push({ id: Date.now(), nombre });
+        document.getElementById('nombreTrabajador').value = '';
+        guardarDB();
+      }
+    }
+
+    function delTrabajador(id) {
+      DB.trabajadores = DB.trabajadores.filter(t => t.id !== id);
+      guardarDB();
+    }
+
+    function cargarAjustes() {
+      document.getElementById('listaTrabajos').innerHTML = DB.trabajos.map(t => 
+        `<li class="py-2 flex justify-between items-center">${t.nombre} (${t.tiempo} min) <button onclick="delTrabajo(${t.id})" class="text-red-600 font-bold">X</button></li>`
+      ).join('');
+      
+      document.getElementById('listaTrabajadores').innerHTML = DB.trabajadores.map(t => 
+        `<li class="py-2 flex justify-between items-center">${t.nombre} <button onclick="delTrabajador(${t.id})" class="text-red-600 font-bold">X</button></li>`
+      ).join('');
+    }
+
+    // --- INICIAR DÍA ---
+    function cargarFormularioDia() {
+      document.getElementById('selectTrabajo').innerHTML = DB.trabajos.map(t => 
+        `<option value="${t.id}">${t.nombre} (${t.tiempo} min)</option>`
+      ).join('');
+
+      document.getElementById('listaTrabajadoresCheck').innerHTML = DB.trabajadores.map(t => 
+        `<label class="flex items-center gap-2"><input type="checkbox" value="${t.nombre}"> ${t.nombre}</label>`
+      ).join('');
+    }
+
+    function iniciarContador() {
+      const trabajoId = document.getElementById('selectTrabajo').value;
+      const trabajo = DB.trabajos.find(t => t.id == trabajoId);
+      if(!trabajo) return alert("Añade primero un trabajo en Ajustes");
+
+      trabajoActivo = trabajo;
+      let segundos = trabajo.tiempo * 60;
+      
+      document.getElementById('panelTimer').classList.remove('hidden');
+      
+      clearInterval(timerId);
+      timerId = setInterval(() => {
+        segundos--;
+        const min = Math.floor(segundos / 60);
+        const seg = segundos % 60;
+        document.getElementById('timerMinutos').textContent = `${min.toString().padStart(2, '0')}:${seg.toString().padStart(2, '0')}`;
+        if(segundos <= 0) clearInterval(timerId);
+      }, 1000);
+    }
+
+    function finalizarTrabajo() {
+      clearInterval(timerId);
+      document.getElementById('panelTimer').classList.add('hidden');
+
+      const seleccionados = Array.from(document.querySelectorAll('#listaTrabajadoresCheck input:checked')).map(c => c.value);
+      
+      const nuevoRegistro = {
+        fecha: document.getElementById('fechaDia').value,
+        trabajo: trabajoActivo.nombre,
+        tiempo: trabajoActivo.tiempo + " min",
+        trabajadores: seleccionados.join(', ') || 'Ninguno',
+        observaciones: document.getElementById('obsDia').value
+      };
+
+      DB.registros.push(nuevoRegistro);
+      guardarDB();
+      document.getElementById('obsDia').value = '';
+      alert("Trabajo guardado en el historial");
+    }
+
+    // --- HISTORIAL & EXPORTAR ---
+    function cargarHistorial() {
+      document.getElementById('tablaHistorial').innerHTML = DB.registros.map(r => `
+        <tr class="border-b">
+          <td class="p-2">${r.fecha}</td>
+          <td class="p-2 font-semibold">${r.trabajo}</td>
+          <td class="p-2">${r.trabajadores}</td>
+          <td class="p-2">${r.tiempo}</td>
+          <td class="p-2 text-sm text-gray-600">${r.observaciones}</td>
+        </tr>
+      `).join('');
+    }
+
+    function exportarExcel() {
+      if(DB.registros.length === 0) return alert("No hay datos para exportar");
+      const ws = XLSX.utils.json_to_sheet(DB.registros);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Registros");
+      XLSX.writeFile(wb, `Reporte_Jornada_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    // --- FUNCIONES DE ENVÍO DE CORREO ---
+    function abrirModalEmail() {
+      if(DB.registros.length === 0) return alert("No hay datos cargados para enviar");
+      document.getElementById('modalEmail').classList.remove('hidden');
+    }
+
+    function cerrarModalEmail() {
+      document.getElementById('modalEmail').classList.add('hidden');
+    }
+
+    // Método 1: Apertura directa del cliente de correo por defecto
+    function abrirClienteMail() {
+      const email = document.getElementById('emailDestino').value;
+      if(!email) return alert("Introduce una dirección de correo");
+
+      // Exporta automáticamente el archivo Excel para adjuntar
+      exportarExcel();
+
+      let textoResumen = "Resumen del día:\n\n";
+      DB.registros.forEach(r => {
+        textoResumen += `- Fecha: ${r.fecha} | Trabajo: ${r.trabajo} | Personal: ${r.trabajadores} | Notas: ${r.observaciones}\n`;
+      });
+
+      const subject = encodeURIComponent(`Reporte de Jornada - ${new Date().toLocaleDateString()}`);
+      const body = encodeURIComponent(textoResumen + "\n\n(Se ha descargado automáticamente el archivo Excel para adjuntar)");
+
+      window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+      cerrarModalEmail();
+    }
+
+    // Método 2: Envío automático mediante servicio EmailJS
+    function enviarCorreoEmailJS() {
+      const email = document.getElementById('emailDestino').value;
+      if(!email) return alert("Introduce un correo de destino");
+
+      let resumen = DB.registros.map(r => 
+        `Fecha: ${r.fecha} - Trabajo: ${r.trabajo} (${r.tiempo}) - Personal: ${r.trabajadores} - Obs: ${r.observaciones}`
+      ).join("\n");
+
+      // Parámetros para tu plantilla en EmailJS
+      const templateParams = {
+        to_email: email,
+        subject: `Reporte de Trabajo ${new Date().toLocaleDateString()}`,
+        message: resumen
+      };
+
+      // Si no has puesto las claves te mostrará una alerta indicativa
+      emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
+        .then(function() {
+           alert('¡Correo enviado con éxito!');
+           cerrarModalEmail();
+        }, function(error) {
+           alert('Para activar el envío directo, configura tus claves gratuitas de EmailJS. Por ahora usa la opción "Abrir App de Correo".');
+        });
+    }
+
+    // --- COMENTARIOS ---
+    function cargarComentarios() {
+      document.getElementById('selectTrabajadorComentario').innerHTML = DB.trabajadores.map(t => 
+        `<option value="${t.nombre}">${t.nombre}</option>`
+      ).join('');
+
+      document.getElementById('listaComentarios').innerHTML = DB.comentarios.map(c => `
+        <div class="bg-white p-3 rounded shadow">
+          <span class="font-bold text-blue-700">${c.trabajador}</span> <span class="text-xs text-gray-400">(${c.fecha})</span>
+          <p class="text-gray-700 mt-1">${c.texto}</p>
+        </div>
+      `).join('');
+    }
+
+    function guardarComentario() {
+      const trabajador = document.getElementById('selectTrabajadorComentario').value;
+      const texto = document.getElementById('textoComentario').value.trim();
+      if(texto) {
+        DB.comentarios.unshift({
+          fecha: new Date().toLocaleDateString(),
+          trabajador,
+          texto
+        });
+        document.getElementById('textoComentario').value = '';
+        guardarDB();
+        cargarComentarios();
+      }
+    }
+
+    // Carga inicial
+    cargarAjustes();
+    cargarFormularioDia();
+  </script>
+</body>
+</html>
