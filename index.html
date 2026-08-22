@@ -23,8 +23,13 @@
           <input type="date" id="fechaPlan" onchange="cambiarFecha()" class="bg-transparent text-xs font-semibold text-gray-700 outline-none">
         </div>
 
+        <!-- BOTÓN ASIGNAR TRABAJOS DEL DÍA -->
+        <button onclick="openSeleccionTrabajosModal()" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 flex items-center gap-1.5 transition">
+          <span>📋</span> Trabajos del Día
+        </button>
+
         <!-- BOTÓN DE AJUSTES -->
-        <button onclick="openSettingsModal()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-200 flex items-center gap-1.5 transition">
+        <button onclick="openSettingsModal()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-200 flex items-center gap-1.5 transition">
           <span>⚙️</span> Ajustes del Sistema
         </button>
       </div>
@@ -37,7 +42,7 @@
     <!-- DISPONIBLES -->
     <section class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col h-[680px]">
       <div class="flex justify-between items-center mb-4 pb-2 border-b">
-        <h2 class="font-bold text-gray-800 flex items-center gap-2"><span>📋</span> Lista Principal</h2>
+        <h2 class="font-bold text-gray-800 flex items-center gap-2"><span>👤</span> Lista Principal</h2>
         <span id="countDisponibles" class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">0 Disponibles</span>
       </div>
       <div id="listaDisponibles" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
@@ -45,11 +50,29 @@
 
     <!-- TRABAJOS EN PROCESO -->
     <section class="md:col-span-2 space-y-4">
-      <h2 class="font-bold text-gray-800 flex items-center gap-2 mb-2"><span>🏗️</span> Trabajos en Proceso</h2>
+      <h2 class="font-bold text-gray-800 flex items-center gap-2 mb-2"><span>🏗️</span> Trabajos Programados para el Día</h2>
       <div id="contenedorTrabajos" class="space-y-4"></div>
     </section>
 
   </main>
+
+  <!-- MODAL SELECCIONAR TRABAJOS DEL DÍA -->
+  <div id="seleccionTrabajosModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center pb-3 border-b">
+        <h3 class="text-base font-bold text-gray-800">Seleccionar Trabajos para hoy (<span id="modalFechaTitulo">--</span>)</h3>
+        <button onclick="closeSeleccionTrabajosModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+      </div>
+      <p class="text-xs text-gray-500 my-3">Selecciona qué trabajos se van a realizar en la fecha seleccionada. Al cambiar de día, la lista se vaciará para programarla de nuevo.</p>
+      
+      <div id="listaCheckTrabajos" class="space-y-2 my-4 max-h-60 overflow-y-auto border border-gray-200 p-3 rounded-lg"></div>
+
+      <div class="text-right space-x-2 border-t pt-3">
+        <button onclick="closeSeleccionTrabajosModal()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-xs">Cancelar</button>
+        <button onclick="guardarTrabajosDelDia()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs">Guardar Selección</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL REASIGNAR / DESVINCULAR -->
   <div id="moverModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
@@ -69,7 +92,7 @@
         </button>
       </div>
 
-      <h4 class="font-semibold text-gray-700 mb-2 text-sm">Mover a otro trabajo en proceso:</h4>
+      <h4 class="font-semibold text-gray-700 mb-2 text-sm">Mover a otro trabajo del día:</h4>
       <div class="overflow-x-auto border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
         <table class="w-full text-left text-sm text-gray-600">
           <thead class="bg-gray-100 text-gray-700 font-semibold border-b text-xs">
@@ -142,7 +165,7 @@
         <h3 class="text-base font-bold text-gray-800">Asignar trabajo a: <span id="modalNombreAsignar" class="text-emerald-600">--</span></h3>
         <button onclick="closeAsignarModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
       </div>
-      <div class="my-4 space-y-2" id="listaTrabajosParaAsignar"></div>
+      <div class="my-4 space-y-2 max-h-60 overflow-y-auto" id="listaTrabajosParaAsignar"></div>
       <div class="text-right">
         <button onclick="closeAsignarModal()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-xs">Cancelar</button>
       </div>
@@ -171,21 +194,20 @@
         <!-- 2. PERSONAL -->
         <div class="border rounded-lg p-4 bg-gray-50/50">
           <h4 class="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2"><span>👤</span> Personal del Sistema</h4>
-          <form onsubmit="crearTrabajador(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-            <input type="text" id="nuevoNombre" placeholder="Nombre completo" required class="p-2 text-xs border rounded-lg">
-            <input type="text" id="nuevoRol" placeholder="Cargo / Rol" required class="p-2 text-xs border rounded-lg">
-            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-lg transition">+ Añadir Trabajador</button>
+          <form onsubmit="crearTrabajador(event)" class="flex gap-2 mb-4">
+            <input type="text" id="nuevoNombre" placeholder="Nombre completo" required class="flex-1 p-2 text-xs border rounded-lg">
+            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">+ Añadir Trabajador</button>
           </form>
           <div id="listaEliminarSistema" class="space-y-2 max-h-36 overflow-y-auto"></div>
         </div>
 
-        <!-- 3. TRABAJOS -->
+        <!-- 3. CATÁLOGO DE TRABAJOS GENERALES -->
         <div class="border rounded-lg p-4 bg-gray-50/50">
-          <h4 class="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2"><span>🏗️</span> Trabajos y Duración</h4>
-          <form onsubmit="crearTrabajo(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-            <input type="text" id="nuevoTrabajoNombre" placeholder="Nombre del Trabajo" required class="p-2 text-xs border rounded-lg">
+          <h4 class="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2"><span>🏗️</span> Catálogo de Trabajos Disponibles</h4>
+          <form onsubmit="crearTrabajoCatalogo(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+            <input type="text" id="nuevoTrabajoNombre" placeholder="Nombre del Trabajo" required class="p-2 text-xs border rounded-lg sm:col-span-2">
             <input type="number" id="nuevoTrabajoMinutos" placeholder="Minutos (Ej: 60)" required class="p-2 text-xs border rounded-lg">
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-lg transition">+ Añadir Trabajo</button>
+            <button type="submit" class="sm:col-span-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-lg transition">+ Añadir al Catálogo General</button>
           </form>
           <div id="listaTrabajosAjustes" class="space-y-2 max-h-36 overflow-y-auto"></div>
         </div>
@@ -200,10 +222,11 @@
   <script>
     let fechaSeleccionada = new Date().toISOString().split('T')[0];
 
-    // ESTRUCTURAS DE DATOS VACÍAS
+    // ESTRUCTURAS DE DATOS
     let notasRapidas = [];
-    let trabajadores = [];
-    let trabajos = [];
+    let trabajadores = []; // { id, nombre, obs }
+    let catalogoTrabajos = []; // { id, nombre, duracionMin }
+    let programacionPorDia = {}; // { "YYYY-MM-DD": [ { id, catalogoId, nombre, duracionMin, tiempoRestanteSec, activo, obs } ] }
 
     let seleccionadoId = null;
     let trabajoSeleccionadoId = null;
@@ -213,14 +236,20 @@
 
     function cambiarFecha() {
       fechaSeleccionada = document.getElementById('fechaPlan').value;
+      // Al cambiar de fecha, si no hay trabajos programados para ese día, la lista se queda vacía (cada día se programa desde cero)
       renderApp();
+    }
+
+    function obtenerTrabajosDelDiaActual() {
+      return programacionPorDia[fechaSeleccionada] || [];
     }
 
     function iniciarBucleTemporizadores() {
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
         let cambiado = false;
-        trabajos.forEach(tr => {
+        const trabajosHoy = obtenerTrabajosDelDiaActual();
+        trabajosHoy.forEach(tr => {
           if (tr.activo && tr.tiempoRestanteSec > 0) {
             tr.tiempoRestanteSec--;
             cambiado = true;
@@ -244,15 +273,29 @@
 
     function renderDisponibles() {
       const lista = document.getElementById('listaDisponibles');
-      const disponibles = trabajadores.filter(t => t.trabajoId === null);
-      document.getElementById('countDisponibles').innerText = `${disponibles.length} Disponibles`;
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const idsTrabajosHoy = trabajosHoy.map(t => t.id);
 
-      if (disponibles.length === 0) {
+      // Un trabajador está disponible si no tiene asignado un trabajo del día actual
+      const disponibles = trabajadores.filter(t => t.trabajoIdDia !== fechaSeleccionada || !idsTrabajosHoy.includes(t.trabajoActualId));
+      
+      // Limpiar asignaciones huérfanas si el trabajo ya no está en el día
+      trabajadores.forEach(t => {
+        if (t.trabajoIdDia === fechaSeleccionada && !idsTrabajosHoy.includes(t.trabajoActualId)) {
+          t.trabajoActualId = null;
+          t.trabajoIdDia = null;
+        }
+      });
+
+      const actualesDisponibles = trabajadores.filter(t => !t.trabajoActualId || t.trabajoIdDia !== fechaSeleccionada);
+      document.getElementById('countDisponibles').innerText = `${actualesDisponibles.length} Disponibles`;
+
+      if (actualesDisponibles.length === 0) {
         lista.innerHTML = `<p class="text-xs text-gray-400 text-center py-8">No hay personal disponible. Añade trabajadores desde Ajustes ⚙️.</p>`;
         return;
       }
 
-      lista.innerHTML = disponibles.map(t => `
+      lista.innerHTML = actualesDisponibles.map(t => `
         <div class="bg-emerald-50/50 border border-emerald-200 p-3 rounded-lg flex justify-between items-center">
           <div class="flex items-center space-x-3 cursor-pointer group" onclick="openObsPersonaModal(${t.id})" title="Haz clic para observaciones">
             <div class="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
@@ -260,7 +303,6 @@
             </div>
             <div>
               <p class="font-semibold text-sm text-gray-800 group-hover:text-emerald-700 transition">${t.nombre} 📝</p>
-              <p class="text-[10px] text-emerald-600 font-medium">${t.rol}</p>
               ${t.obs ? `<p class="text-[10px] text-amber-700 italic">💬 ${t.obs}</p>` : ''}
             </div>
           </div>
@@ -273,14 +315,15 @@
 
     function renderTrabajos() {
       const contenedor = document.getElementById('contenedorTrabajos');
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
       
-      if (trabajos.length === 0) {
-        contenedor.innerHTML = `<p class="text-xs text-gray-400 text-center py-8 bg-white rounded-xl border border-gray-200">No hay trabajos registrados. Añade trabajos desde Ajustes ⚙️.</p>`;
+      if (trabajosHoy.length === 0) {
+        contenedor.innerHTML = `<p class="text-xs text-gray-400 text-center py-8 bg-white rounded-xl border border-gray-200">No hay trabajos programados para hoy. Haz clic en <strong>"Trabajos del Día"</strong> arriba para seleccionar cuáles se realizarán hoy.</p>`;
         return;
       }
 
-      contenedor.innerHTML = trabajos.map(tr => {
-        const integrantes = trabajadores.filter(t => t.trabajoId === tr.id);
+      contenedor.innerHTML = trabajosHoy.map(tr => {
+        const integrantes = trabajadores.filter(t => t.trabajoActualId === tr.id && t.trabajoIdDia === fechaSeleccionada);
 
         let botonTiempoHTML = '';
         if (!tr.activo && tr.tiempoRestanteSec > 0) {
@@ -324,7 +367,6 @@
                     </div>
                     <div>
                       <p class="font-semibold text-sm text-gray-800 group-hover:text-indigo-600 transition">${t.nombre} 📝</p>
-                      <p class="text-[11px] text-gray-500">${t.rol}</p>
                       ${t.obs ? `<p class="text-[10px] text-amber-700 italic truncate max-w-[130px]">💬 ${t.obs}</p>` : ''}
                     </div>
                   </div>
@@ -337,13 +379,15 @@
     }
 
     function toggleTimerTrabajo(id) {
-      const tr = trabajos.find(x => x.id === id);
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === id);
       if (tr) tr.activo = true;
       renderTrabajos();
     }
 
     function confirmarFinalizarTrabajo(id) {
-      const tr = trabajos.find(x => x.id === id);
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === id);
       if (!tr) return;
       if (confirm(`¿Deseas finalizar el trabajo "${tr.nombre}"?`)) {
         tr.activo = false;
@@ -352,19 +396,82 @@
       }
     }
 
+    // MODAL SELECCIONAR TRABAJOS DEL DÍA
+    function openSeleccionTrabajosModal() {
+      document.getElementById('modalFechaTitulo').innerText = fechaSeleccionada;
+      const contenedor = document.getElementById('listaCheckTrabajos');
+
+      if (catalogoTrabajos.length === 0) {
+        contenedor.innerHTML = `<p class="text-xs text-gray-400 italic text-center py-4">No hay trabajos en el catálogo general. Añádelos primero en Ajustes ⚙️.</p>`;
+      } else {
+        const trabajosHoy = obtenerTrabajosDelDiaActual();
+        const idsActuales = trabajosHoy.map(t => t.catalogoId);
+
+        contenedor.innerHTML = catalogoTrabajos.map(item => `
+          <label class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer border border-transparent hover:border-gray-200">
+            <input type="checkbox" value="${item.id}" ${idsActuales.includes(item.id) ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 check-trabajo-dia">
+            <div class="text-xs">
+              <span class="font-semibold text-gray-800">${item.nombre}</span>
+              <span class="text-gray-500 ml-1">(${item.duracionMin} mins)</span>
+            </div>
+          </label>
+        `).join('');
+      }
+
+      document.getElementById('seleccionTrabajosModal').classList.remove('hidden');
+      document.getElementById('seleccionTrabajosModal').classList.add('flex');
+    }
+
+    function closeSeleccionTrabajosModal() {
+      document.getElementById('seleccionTrabajosModal').classList.add('hidden');
+      document.getElementById('seleccionTrabajosModal').classList.remove('flex');
+    }
+
+    function guardarTrabajosDelDia() {
+      const checkboxes = document.querySelectorAll('.check-trabajo-dia:checked');
+      const seleccionadosIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+      let trabajosHoyActuales = programacionPorDia[fechaSeleccionada] || [];
+
+      // Construir nueva lista manteniendo los estados/tiempos si ya existían
+      let nuevaLista = [];
+      seleccionadosIds.forEach(catId => {
+        let existente = trabajosHoyActuales.find(t => t.catalogoId === catId);
+        let catItem = catalogoTrabajos.find(c => c.id === catId);
+        if (existente) {
+          nuevaLista.push(existente);
+        } else if (catItem) {
+          nuevaLista.push({
+            id: Date.now() + Math.random(),
+            catalogoId: catItem.id,
+            nombre: catItem.nombre,
+            duracionMin: catItem.duracionMin,
+            tiempoRestanteSec: catItem.duracionMin * 60,
+            activo: false,
+            obs: ""
+          });
+        }
+      });
+
+      programacionPorDia[fechaSeleccionada] = nuevaLista;
+      closeSeleccionTrabajosModal();
+      renderApp();
+    }
+
     function openMoverModal(id) {
       seleccionadoId = id;
       const t = trabajadores.find(x => x.id === id);
       document.getElementById('modalMoverNombre').innerText = t.nombre;
 
       const tbody = document.getElementById('tablaReasignacionBody');
-      const otrosTrabajos = trabajos.filter(tr => tr.id !== t.trabajoId);
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const otrosTrabajos = trabajosHoy.filter(tr => tr.id !== t.trabajoActualId);
 
       if (otrosTrabajos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-gray-400 italic">No hay otros trabajos disponibles</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-gray-400 italic">No hay otros trabajos programados para hoy</td></tr>`;
       } else {
         tbody.innerHTML = otrosTrabajos.map(tr => {
-          const miembros = trabajadores.filter(x => x.trabajoId === tr.id);
+          const miembros = trabajadores.filter(x => x.trabajoActualId === tr.id && x.trabajoIdDia === fechaSeleccionada);
           const nombresTexto = miembros.length > 0 
             ? miembros.map(m => m.nombre).join(', ')
             : '<span class="text-gray-400 italic">Sin integrantes</span>';
@@ -395,14 +502,20 @@
 
     function accionDesvincular() {
       const t = trabajadores.find(x => x.id === seleccionadoId);
-      if (t) t.trabajoId = null;
+      if (t) {
+        t.trabajoActualId = null;
+        t.trabajoIdDia = null;
+      }
       closeMoverModal();
       renderApp();
     }
 
     function accionReasignar(nuevoTrabajoId) {
       const t = trabajadores.find(x => x.id === seleccionadoId);
-      if (t) t.trabajoId = nuevoTrabajoId;
+      if (t) {
+        t.trabajoActualId = nuevoTrabajoId;
+        t.trabajoIdDia = fechaSeleccionada;
+      }
       closeMoverModal();
       renderApp();
     }
@@ -453,7 +566,8 @@
 
     function openObsTrabajoModal(id) {
       trabajoSeleccionadoId = id;
-      const tr = trabajos.find(x => x.id === id);
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === id);
       document.getElementById('modalTrabajoNombre').innerText = tr.nombre;
       document.getElementById('obsTrabajoInput').value = tr.obs || '';
 
@@ -467,7 +581,8 @@
     }
 
     function guardarObsTrabajo() {
-      const tr = trabajos.find(x => x.id === trabajoSeleccionadoId);
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
       if (tr) {
         tr.obs = document.getElementById('obsTrabajoInput').value;
         renderTrabajos();
@@ -481,10 +596,12 @@
       document.getElementById('modalNombreAsignar').innerText = t.nombre;
 
       const cont = document.getElementById('listaTrabajosParaAsignar');
-      if (trabajos.length === 0) {
-        cont.innerHTML = `<p class="text-xs text-gray-400 italic py-2">No hay trabajos creados aún.</p>`;
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+
+      if (trabajosHoy.length === 0) {
+        cont.innerHTML = `<p class="text-xs text-gray-400 italic py-2 text-center">No hay trabajos programados para hoy. Selecciona primero en "Trabajos del Día".</p>`;
       } else {
-        cont.innerHTML = trabajos.map(tr => `
+        cont.innerHTML = trabajosHoy.map(tr => `
           <button onclick="accionReasignar(${tr.id}); closeAsignarModal();" class="w-full text-left p-3 border rounded-lg hover:bg-indigo-50 hover:border-indigo-300 flex justify-between items-center transition">
             <span class="font-medium text-gray-800 text-sm">${tr.nombre}</span>
             <span class="text-xs text-indigo-600 font-semibold">Asignar ➔</span>
@@ -518,18 +635,18 @@
         ? `<p class="text-xs text-gray-400 italic">No hay personal en el sistema.</p>`
         : trabajadores.map(t => `
           <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-200 text-xs">
-            <span><strong>${t.nombre}</strong> (${t.rol})</span>
+            <span><strong>${t.nombre}</strong></span>
             <button onclick="eliminarDelSistema(${t.id})" class="text-red-600 hover:text-red-800 font-semibold">Eliminar</button>
           </div>
         `).join('');
 
       const elTrabajos = document.getElementById('listaTrabajosAjustes');
-      elTrabajos.innerHTML = trabajos.length === 0
-        ? `<p class="text-xs text-gray-400 italic">No hay trabajos configurados.</p>`
-        : trabajos.map(tr => `
+      elTrabajos.innerHTML = catalogoTrabajos.length === 0
+        ? `<p class="text-xs text-gray-400 italic">No hay trabajos en el catálogo general.</p>`
+        : catalogoTrabajos.map(tr => `
           <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-200 text-xs">
             <span><strong>${tr.nombre}</strong> — ${tr.duracionMin} mins</span>
-            <button onclick="eliminarTrabajo(${tr.id})" class="text-red-600 hover:text-red-800 font-semibold">Eliminar</button>
+            <button onclick="eliminarTrabajoCatalogo(${tr.id})" class="text-red-600 hover:text-red-800 font-semibold">Eliminar</button>
           </div>
         `).join('');
 
@@ -562,10 +679,8 @@
     function crearTrabajador(e) {
       e.preventDefault();
       const nombre = document.getElementById('nuevoNombre').value;
-      const rol = document.getElementById('nuevoRol').value;
-      trabajadores.push({ id: Date.now(), nombre, rol, trabajoId: null, obs: "" });
+      trabajadores.push({ id: Date.now(), nombre, trabajoActualId: null, trabajoIdDia: null, obs: "" });
       document.getElementById('nuevoNombre').value = '';
-      document.getElementById('nuevoRol').value = '';
       renderAjustesListas();
       renderApp();
     }
@@ -578,23 +693,20 @@
       }
     }
 
-    function crearTrabajo(e) {
+    function crearTrabajoCatalogo(e) {
       e.preventDefault();
       const nombre = document.getElementById('nuevoTrabajoNombre').value;
       const mins = parseInt(document.getElementById('nuevoTrabajoMinutos').value) || 30;
-      trabajos.push({ id: Date.now(), nombre, duracionMin: mins, tiempoRestanteSec: mins * 60, activo: false, obs: "" });
+      catalogoTrabajos.push({ id: Date.now(), nombre, duracionMin: mins });
       document.getElementById('nuevoTrabajoNombre').value = '';
       document.getElementById('nuevoTrabajoMinutos').value = '';
       renderAjustesListas();
-      renderApp();
     }
 
-    function eliminarTrabajo(id) {
-      if (confirm("¿Eliminar este trabajo?")) {
-        trabajadores.forEach(t => { if (t.trabajoId === id) t.trabajoId = null; });
-        trabajos = trabajos.filter(tr => tr.id !== id);
+    function eliminarTrabajoCatalogo(id) {
+      if (confirm("¿Eliminar este trabajo del catálogo general?")) {
+        catalogoTrabajos = catalogoTrabajos.filter(tr => tr.id !== id);
         renderAjustesListas();
-        renderApp();
       }
     }
 
