@@ -58,14 +58,14 @@
       <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
         <div>
           <h2 class="font-bold text-gray-800 text-lg">Resumen del Día</h2>
-          <p class="text-xs text-gray-500">Histórico completo e imborrable de asignaciones, tiempos reales e incidencias</p>
+          <p class="text-xs text-gray-500">Tiempo total trabajado por persona y desglose por cada tarea realizada</p>
         </div>
         <button onclick="exportarExcel()" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition">
           <span>📊</span> Exportar a Excel
         </button>
       </div>
 
-      <div id="contenedorResumenDia" class="space-y-4"></div>
+      <div id="contenedorResumenDia" class="space-y-6"></div>
     </div>
   </main>
 
@@ -323,7 +323,6 @@
       const ahora = Date.now();
 
       trabajadores.forEach(t => {
-        // Verificar si está activamente trabajando o en pausa de 30 min
         const estaEnTrabajoActivoOPausa = trabajosHoy.some(tr => 
           (tr.activo || tr.enPausa30) && tr.asignadosIds && tr.asignadosIds.includes(t.id)
         );
@@ -331,7 +330,6 @@
         if (estaEnTrabajoActivoOPausa) {
           delete inicioExcesoPorPersona[t.id];
         } else {
-          // SOLO cuenta exceso si ya ha participado previamente en un trabajo que haya iniciado alguna vez
           const haTrabajadoPreviamente = trabajosHoy.some(tr => 
             tr.iniciadoAlgunaVez && tr.historialAsignados && tr.historialAsignados.includes(t.id)
           );
@@ -507,7 +505,7 @@
       }).join('');
     }
 
-    /* RENDER RESUMEN DEL DÍA */
+    /* RENDER RESUMEN DEL DÍA (TABLA SIMPLIFICADA) */
     function renderResumenDia() {
       const contenedor = document.getElementById('contenedorResumenDia');
       const trabajosHoy = obtenerTrabajosDelDiaActual();
@@ -518,51 +516,137 @@
         return;
       }
 
-      contenedor.innerHTML = trabajosHoy.map(tr => {
+      // Mapa para procesar tiempos totales por persona y desglose por trabajos
+      const datosPorPersona = {};
+
+      trabajadores.forEach(t => {
+        datosPorPersona[t.id] = {
+          nombre: t.nombre,
+          trabajos: [],
+          tiempoTotalSec: 0
+        };
+      });
+
+      trabajosHoy.forEach(tr => {
+        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+        if (!tr.historialAsignados) tr.historialAsignados = [];
+
+        const trabajadoresInvolucrados = Array.from(new Set([
+          ...(tr.asignadosIds || []),
+          ...(tr.historialAsignados || []),
+          ...Object.keys(tr.tiemposTrabajadores).map(id => parseInt(id))
+        ]));
+
+        trabajadoresInvolucrados.forEach(tId => {
+          const tiempoSeg = tr.tiemposTrabajadores[tId] || 0;
+          if (tiempoSeg > 0 || (tr.asignadosIds || []).includes(tId)) {
+            if (!datosPorPersona[tId]) {
+              const p = trabajadores.find(x => x.id === tId);
+              datosPorPersona[tId] = { nombre: p ? p.nombre : `Persona #${tId}`, trabajos: [], tiempoTotalSec: 0 };
+            }
+
+            datosPorPersona[tId].trabajos.push({
+              nombreTrabajo: tr.nombre,
+              tiempoSeg: tiempoSeg
+            });
+            datosPorPersona[tId].tiempoTotalSec += tiempoSeg;
+          }
+        });
+      });
+
+      const personasConActividad = Object.values(datosPorPersona).filter(p => p.trabajos.length > 0);
+
+      if (personasConActividad.length === 0) {
+        contenedor.innerHTML = `<p class="text-xs text-gray-400 italic text-center py-4">Aún no se ha registrado tiempo de trabajo en ninguna tarea.</p>`;
+        return;
+      }
+
+      // Generación de la Tabla Resumen Simplificada
+      const filasTablaHTML = personasConActividad.map(p => {
+        const desgloseTrabajosHTML = p.trabajos.map(t => `
+          <div class="flex justify-between items-center bg-white px-2.5 py-1 rounded border border-gray-100 text-xs mb-1">
+            <span class="font-medium text-gray-700">${t.nombreTrabajo}</span>
+            <span class="font-bold text-indigo-600">${formatearTiempo(t.tiempoSeg)}</span>
+          </div>
+        `).join('');
+
+        return `
+          <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+            <td class="p-3 font-bold text-gray-800 align-top text-xs w-1/4">
+              <span>👤</span> ${p.nombre}
+            </td>
+            <td class="p-3 align-top w-2/4">
+              ${desgloseTrabajosHTML}
+            </td>
+            <td class="p-3 font-extrabold text-emerald-700 align-top text-xs text-right w-1/4">
+              <span class="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                ⏱️ ${formatearTiempo(p.tiempoTotalSec)}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const tablaHTML = `
+        <div class="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                <th class="p-3">Trabajador</th>
+                <th class="p-3">Tiempo por Trabajo</th>
+                <th class="p-3 text-right">Tiempo Total Trabajado</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              ${filasTablaHTML}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      // Generación de Notas e Historial por Trabajo
+      const historialNotasHTML = trabajosHoy.map(tr => {
         if (!tr.historialAsignados) tr.historialAsignados = [];
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
 
-        // INCLUIR TANTO ASIGNADOS ACTUALES COMO HISTÓRICOS QUE HAYAN REGISTRADO TIEMPO
-        const trabajadoresConTiempo = Object.keys(tr.tiemposTrabajadores).map(id => parseInt(id));
-        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || []), ...trabajadoresConTiempo]))
-          .map(id => trabajadores.find(t => t.id === id))
-          .filter(Boolean);
+        const todosLosInvolucrados = Array.from(new Set([
+          ...(tr.asignadosIds || []),
+          ...(tr.historialAsignados || []),
+          ...Object.keys(tr.tiemposTrabajadores).map(id => parseInt(id))
+        ])).map(id => trabajadores.find(t => t.id === id)).filter(Boolean);
 
-        const desgloseTrabajadores = todosLosInvolucrados.length > 0
-          ? todosLosInvolucrados.map(t => {
-              const notas = obsDia[t.id] || 'Sin notas registradas';
-              const tiempoInvertidoSec = tr.tiemposTrabajadores[t.id] || 0;
-              const esActual = (tr.asignadosIds || []).includes(t.id);
-
-              return `
-                <div class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-1">
-                  <div class="flex justify-between font-semibold text-gray-800">
-                    <span>👤 ${t.nombre} ${!esActual ? '<span class="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 font-normal ml-1">Desvinculado / Cambiado</span>' : ''}</span>
-                    <span class="text-indigo-600">⏱️ Tiempo real trabajado: ${formatearTiempo(tiempoInvertidoSec)}</span>
-                  </div>
-                  <div class="text-gray-600 italic text-[11px] bg-white p-2 rounded border border-gray-100">
-                    📝 ${notas}
-                  </div>
-                </div>
-              `;
-            }).join('')
-          : `<p class="text-xs text-gray-400 italic">Sin trabajadores registrados en este trabajo.</p>`;
+        const desgloseNotas = todosLosInvolucrados.map(t => {
+          const notas = obsDia[t.id];
+          if (!notas) return '';
+          return `
+            <div class="text-xs text-gray-600 bg-white p-2 rounded border border-gray-100 mt-1">
+              <strong>👤 ${t.nombre}:</strong> <span class="italic">${notas}</span>
+            </div>
+          `;
+        }).join('');
 
         return `
-          <div class="border border-gray-200 rounded-lg p-3 bg-gray-50/30">
-            <div class="flex justify-between items-center mb-1">
-              <h4 class="font-bold text-sm text-gray-800">${tr.nombre}</h4>
-              <span class="text-xs font-semibold text-gray-500">Duración estimada: ${tr.duracionMin} min</span>
+          <div class="border border-gray-200 rounded-lg p-3 bg-gray-50/40">
+            <div class="flex justify-between items-center">
+              <h4 class="font-bold text-xs text-gray-800">${tr.nombre}</h4>
+              <span class="text-[11px] text-gray-500">Estimación: ${tr.duracionMin} min</span>
             </div>
-            <p class="text-xs text-gray-600 mb-3 bg-indigo-50/50 border border-indigo-100 p-2 rounded">
-              <strong>Observaciones del trabajo:</strong> ${tr.obs || 'Ninguna'}
-            </p>
-            <div class="space-y-2 pl-2 border-l-2 border-indigo-300">
-              ${desgloseTrabajadores}
-            </div>
+            ${tr.obs ? `<p class="text-xs text-indigo-600 italic mt-1">💬 ${tr.obs}</p>` : ''}
+            ${desgloseNotas ? `<div class="mt-2 space-y-1">${desgloseNotas}</div>` : ''}
           </div>
         `;
       }).join('');
+
+      contenedor.innerHTML = `
+        ${tablaHTML}
+        
+        <div class="pt-2">
+          <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Notas e Incidencias del Día</h3>
+          <div class="space-y-3">
+            ${historialNotasHTML}
+          </div>
+        </div>
+      `;
     }
 
     /* EXPORTAR A EXCEL (.CSV) */
@@ -576,29 +660,49 @@
       }
 
       let csvContent = "\uFEFF"; 
-      csvContent += "Fecha;Trabajo;Observaciones Trabajo;Trabajador;Estado Asignación;Tiempo Real Trabajado;Notas y Registro con Hora\n";
+      csvContent += "Fecha;Trabajador;Trabajo;Tiempo En Este Trabajo;Tiempo Total Dia Trabajador;Notas y Registro\n";
+
+      const datosPorPersona = {};
+
+      trabajadores.forEach(t => {
+        datosPorPersona[t.id] = { nombre: t.nombre, trabajos: [], tiempoTotalSec: 0 };
+      });
 
       trabajosHoy.forEach(tr => {
-        if (!tr.historialAsignados) tr.historialAsignados = [];
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+        if (!tr.historialAsignados) tr.historialAsignados = [];
 
-        const trabajadoresConTiempo = Object.keys(tr.tiemposTrabajadores).map(id => parseInt(id));
-        const todosLosInvolucrados = Array.from(new Set([...(tr.asignadosIds || []), ...(tr.historialAsignados || []), ...trabajadoresConTiempo]))
-          .map(id => trabajadores.find(t => t.id === id))
-          .filter(Boolean);
+        const trabajadoresInvolucrados = Array.from(new Set([
+          ...(tr.asignadosIds || []),
+          ...(tr.historialAsignados || []),
+          ...Object.keys(tr.tiemposTrabajadores).map(id => parseInt(id))
+        ]));
 
-        const obsTrabajoClean = (tr.obs || '').replace(/;/g, ',').replace(/\n/g, ' ');
+        trabajadoresInvolucrados.forEach(tId => {
+          const tiempoSeg = tr.tiemposTrabajadores[tId] || 0;
+          if (tiempoSeg > 0 || (tr.asignadosIds || []).includes(tId)) {
+            if (!datosPorPersona[tId]) {
+              const p = trabajadores.find(x => x.id === tId);
+              datosPorPersona[tId] = { nombre: p ? p.nombre : `Persona #${tId}`, trabajos: [], tiempoTotalSec: 0 };
+            }
 
-        if (todosLosInvolucrados.length === 0) {
-          csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"Sin asignar";"-";"0m";""\n`;
-        } else {
-          todosLosInvolucrados.forEach(t => {
-            const tiempoInvertidoSec = tr.tiemposTrabajadores[t.id] || 0;
-            const tiempoTexto = formatearTiempo(tiempoInvertidoSec);
-            const notasClean = (obsDia[t.id] || '').replace(/;/g, ',').replace(/\n/g, ' ');
-            const estadoAsig = (tr.asignadosIds || []).includes(t.id) ? "Activo" : "Desvinculado / Cambiado";
-            
-            csvContent += `"${fechaSeleccionada}";"${tr.nombre}";"${obsTrabajoClean}";"${t.nombre}";"${estadoAsig}";"${tiempoTexto}";"${notasClean}"\n`;
+            datosPorPersona[tId].trabajos.push({
+              nombreTrabajo: tr.nombre,
+              tiempoSeg: tiempoSeg
+            });
+            datosPorPersona[tId].tiempoTotalSec += tiempoSeg;
+          }
+        });
+      });
+
+      Object.keys(datosPorPersona).forEach(tId => {
+        const p = datosPorPersona[tId];
+        if (p.trabajos.length > 0) {
+          const tiempoTotalTexto = formatearTiempo(p.tiempoTotalSec);
+          const notasClean = (obsDia[tId] || '').replace(/;/g, ',').replace(/\n/g, ' ');
+
+          p.trabajos.forEach(tr => {
+            csvContent += `"${fechaSeleccionada}";"${p.nombre}";"${tr.nombreTrabajo}";"${formatearTiempo(tr.tiempoSeg)}";"${tiempoTotalTexto}";"${notasClean}"\n`;
           });
         }
       });
@@ -607,7 +711,7 @@
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", `Resumen_Trabajos_${fechaSeleccionada}.csv`);
+      link.setAttribute("download", `Resumen_Simplificado_${fechaSeleccionada}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -836,7 +940,6 @@
         if (!tr.historialAsignados) tr.historialAsignados = [];
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
 
-        // Guardar en el historial a los desvinculados para no perder su registro
         tr.asignadosIds.forEach(idViejo => {
           if (!seleccionadosIds.includes(idViejo)) {
             if (!tr.historialAsignados.includes(idViejo)) {
