@@ -8,7 +8,7 @@
 </head>
 <body class="bg-gray-100 min-h-screen p-6 font-sans">
 
-  <!-- ENCABEZADO -->
+  <!-- ENCABEZADO (Intacto) -->
   <header class="max-w-7xl mx-auto mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
@@ -44,7 +44,7 @@
   <!-- CONTENEDOR PRINCIPAL -->
   <main class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
 
-    <!-- DISPONIBLES -->
+    <!-- DISPONIBLES (Intacto) -->
     <section class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col h-[680px]">
       <div class="flex justify-between items-center mb-4 pb-2 border-b">
         <h2 class="font-bold text-gray-800 flex items-center gap-2"><span>👤</span> Personal Registrado</h2>
@@ -53,13 +53,55 @@
       <div id="listaDisponibles" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
     </section>
 
-    <!-- TRABAJOS EN PROCESO -->
+    <!-- TRABAJOS EN PROCESO (Estructurado por trabajo con nombres visuales) -->
     <section class="md:col-span-2 space-y-4">
       <h2 class="font-bold text-gray-800 flex items-center gap-2 mb-2"><span>🏗️</span> Trabajos Programados para el Día</h2>
       <div id="contenedorTrabajos" class="space-y-4"></div>
     </section>
 
   </main>
+
+  <!-- MODAL GESTIONAR TRABAJO (NIVEL INTERIOR: PARA ACTUAR TRABAJADOR POR TRABAJADOR) -->
+  <div id="gestionTrabajoModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center pb-3 border-b">
+        <div>
+          <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+            <span>🏗️</span> <span id="modalGestionNombre" class="text-indigo-600">--</span>
+          </h3>
+          <p class="text-xs text-gray-500">Gestión de equipo, observaciones e incidencias de este trabajo</p>
+        </div>
+        <button onclick="closeGestionTrabajoModal()" class="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+      </div>
+
+      <!-- OBSERVACIONES DEL TRABAJO -->
+      <div class="my-4 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+        <label class="block text-xs font-bold text-indigo-900 uppercase mb-1">💬 Observaciones Generales del Trabajo:</label>
+        <div class="flex gap-2">
+          <input type="text" id="inputGestionObsTrabajo" placeholder="Añadir nota sobre materiales, estado, incidencias..." class="flex-1 p-2 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          <button onclick="guardarObsTrabajoDesdeModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs transition">Guardar</button>
+        </div>
+      </div>
+
+      <!-- LISTA DE TRABAJADORES (PARA ACTUAR) -->
+      <div class="mb-4">
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="text-xs font-bold text-gray-700 uppercase">Personal Asignado (<span id="modalGestionCount">0</span>):</h4>
+          <button onclick="openVincularModalDesdeGestion()" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-lg transition">
+            + Vincular Más Personal
+          </button>
+        </div>
+
+        <div id="listaGestionTrabajadores" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+          <!-- Se renderizan los trabajadores aquí con sus opciones de actuar -->
+        </div>
+      </div>
+
+      <div class="text-right border-t pt-3">
+        <button onclick="closeGestionTrabajoModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-xs">Cerrar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL SELECCIONAR TRABAJOS DEL DÍA -->
   <div id="seleccionTrabajosModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
@@ -86,37 +128,13 @@
         <h3 class="text-base font-bold text-gray-800">Vincular Personal a: <span id="modalTrabajoVincularNombre" class="text-indigo-600">--</span></h3>
         <button onclick="closeVincularModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
       </div>
-      <p class="text-xs text-gray-500 my-3">Selecciona uno o más trabajadores para añadir a este trabajo. Una misma persona puede estar en varios trabajos.</p>
+      <p class="text-xs text-gray-500 my-3">Selecciona uno o más trabajadores para añadir a este trabajo.</p>
 
       <div id="listaCheckPersonalVincular" class="space-y-2 my-4 max-h-60 overflow-y-auto border border-gray-200 p-3 rounded-lg"></div>
 
       <div class="text-right space-x-2 border-t pt-3">
         <button onclick="closeVincularModal()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-xs">Cancelar</button>
         <button onclick="guardarVinculacionTrabajadores()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs">Guardar Cambios</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL REASIGNAR / DESVINCULAR -->
-  <div id="moverModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
-      <div class="flex justify-between items-center pb-4 border-b">
-        <h3 class="text-base font-bold text-gray-800">Desvincular a: <span id="modalMoverNombre" class="text-indigo-600">--</span></h3>
-        <button onclick="closeMoverModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
-      </div>
-
-      <div class="my-4 p-4 bg-gray-50 rounded-lg border border-gray-200 flex justify-between items-center">
-        <div>
-          <p class="font-medium text-gray-800 text-sm">Quitar de este trabajo</p>
-          <p class="text-xs text-gray-500">Elimina a esta persona únicamente de este trabajo actual.</p>
-        </div>
-        <button onclick="accionDesvincular()" class="px-3.5 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg text-xs transition">
-          Desvincular
-        </button>
-      </div>
-
-      <div class="mt-4 text-right">
-        <button onclick="closeMoverModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-xs">Cancelar</button>
       </div>
     </div>
   </div>
@@ -131,8 +149,7 @@
 
       <div class="my-3">
         <label class="block text-xs font-bold text-amber-800 uppercase mb-1.5">📌 Insertar Nota Rápida (Se añade hora actual):</label>
-        <div id="selectorNotasRapidasCont" class="flex flex-wrap gap-1.5 p-2 bg-amber-50/50 rounded-lg border border-amber-200 max-h-28 overflow-y-auto">
-        </div>
+        <div id="selectorNotasRapidasCont" class="flex flex-wrap gap-1.5 p-2 bg-amber-50/50 rounded-lg border border-amber-200 max-h-28 overflow-y-auto"></div>
       </div>
 
       <div class="mb-4">
@@ -143,25 +160,6 @@
       <div class="text-right space-x-2 border-t pt-3">
         <button onclick="closeObsPersonaModal()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-xs">Cancelar</button>
         <button onclick="guardarObsPersona()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs">Guardar Cambios</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL OBSERVACIONES DEL TRABAJO -->
-  <div id="obsTrabajoModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
-      <div class="flex justify-between items-center pb-3 border-b">
-        <h3 class="text-base font-bold text-gray-800">Observaciones del Trabajo: <span id="modalTrabajoNombre" class="text-indigo-600">--</span></h3>
-        <button onclick="closeObsTrabajoModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
-      </div>
-
-      <div class="my-4">
-        <textarea id="obsTrabajoInput" rows="3" placeholder="Notas sobre el trabajo, materiales, incidencias..." class="w-full p-2.5 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
-      </div>
-
-      <div class="text-right space-x-2">
-        <button onclick="closeObsTrabajoModal()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-xs">Cancelar</button>
-        <button onclick="guardarObsTrabajo()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs">Guardar Observaciones</button>
       </div>
     </div>
   </div>
@@ -230,7 +228,6 @@
   <script>
     let fechaSeleccionada = new Date().toISOString().split('T')[0];
 
-    // ESTRUCTURAS DE DATOS (Persistencia con localStorage)
     let notasRapidas = JSON.parse(localStorage.getItem('gp_notas')) || [];
     let trabajadores = JSON.parse(localStorage.getItem('gp_trabajadores')) || []; 
     let catalogoTrabajos = JSON.parse(localStorage.getItem('gp_catalogo')) || []; 
@@ -293,12 +290,10 @@
       
       const tiempoInvertido = (trabajo.duracionMin * 60) - trabajo.tiempoRestanteSec;
       
-      // Se registra el tiempo en las notas de TODOS los asignados a este trabajo
       trabajo.asignadosIds.forEach(trabajadorId => {
         registrarTiempoEnNota(trabajadorId, trabajo.nombre, tiempoInvertido, motivo);
       });
 
-      // Reset de estados
       trabajo.enPausa30 = false;
       trabajo.tiempoPausa30Sec = 30 * 60;
       trabajo.tiempoRestanteSec = 0;
@@ -330,7 +325,6 @@
         trabajosHoy.forEach(tr => {
           if (!tr.asignadosIds || tr.asignadosIds.length === 0) return;
 
-          // PAUSA DE 30 MINUTOS AUTÓNOMA (Afecta a todo el grupo asignado)
           if (tr.enPausa30) {
             cambiado = true;
             if (tr.tiempoPausa30Sec > 0) {
@@ -341,7 +335,6 @@
               tr.tiempoPausa30Sec = 30 * 60;
             }
           } 
-          // TRABAJO ACTIVO (Corre para todos los asignados)
           else if (tr.activo && tr.tiempoRestanteSec > 0) {
             tr.tiempoRestanteSec--;
             cambiado = true;
@@ -403,10 +396,10 @@
       }).join('');
     }
 
+    <!-- TRABAJOS: CADA TARJETA CON SUS CONTROLES Y NOMBRES SOLO DE LECTURA VISUAL -->
     function renderTrabajos() {
       const contenedor = document.getElementById('contenedorTrabajos');
       const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const obsDia = obtenerObservacionesDiaActual();
       
       if (trabajosHoy.length === 0) {
         contenedor.innerHTML = `<p class="text-xs text-gray-400 text-center py-8 bg-white rounded-xl border border-gray-200">No hay trabajos programados para hoy. Haz clic en <strong>"Trabajos del Día"</strong> arriba para seleccionar cuáles se realizarán hoy.</p>`;
@@ -444,7 +437,7 @@
                 <button onclick="event.stopPropagation(); activarPausa30(${tr.id})" class="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 text-xs font-bold rounded-lg transition" title="Iniciar Pausa de 30 min autónoma">
                   ☕ Pausa 30m
                 </button>
-                <button onclick="event.stopPropagation(); confirmarFinalizarTrabajo(${tr.id})" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 text-xs font-bold rounded-lg transition" title="Parar/Finalizar registrando el tiempo del equipo">
+                <button onclick="event.stopPropagation(); confirmarFinalizarTrabajo(${tr.id})" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 text-xs font-bold rounded-lg transition" title="Parar/Finalizar">
                   🏁 Parar
                 </button>
               </div>`;
@@ -455,56 +448,147 @@
           botonTiempoHTML = `<span class="text-xs text-gray-400 border border-gray-200 px-2 py-0.5 rounded bg-gray-50">Sin asignar</span>`;
         }
 
+        // Etiquetas visuales de nombres (Sólo lectura desde fuera)
+        const etiquetasNombresHTML = integrantes.length > 0 
+          ? integrantes.map(t => `
+              <span class="inline-flex items-center px-2.5 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700">
+                👤 ${t.nombre}
+              </span>
+            `).join('')
+          : `<span class="text-xs text-gray-400 italic">No hay personas asignadas</span>`;
+
         return `
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 transition">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <div class="cursor-pointer" onclick="openObsTrabajoModal(${tr.id})">
-                <h3 class="font-bold text-gray-800 text-base flex items-center gap-1.5">${tr.nombre} <span class="text-xs text-gray-400 font-normal">📝</span></h3>
-                ${tr.obs ? `<p class="text-xs text-indigo-600 italic">💬 ${tr.obs}</p>` : ''}
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 ${tr.activo ? 'border-indigo-300 bg-indigo-50/20' : ''}">
+            <!-- FILA SUPERIOR: NOMBRE DEL TRABAJO + NUMERO PERSONAS + CONTROLES DE TIEMPO SOBRE BOTON -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 border-b pb-3">
+              <div>
+                <h3 class="font-bold text-gray-800 text-base flex items-center gap-2">
+                  <span>🏗️</span> ${tr.nombre}
+                  <span class="bg-indigo-100 text-indigo-800 text-xs font-extrabold px-2 py-0.5 rounded-full border border-indigo-200">
+                    👥 ${integrantes.length} ${integrantes.length === 1 ? 'persona' : 'personas'}
+                  </span>
+                </h3>
+                ${tr.obs ? `<p class="text-xs text-indigo-600 italic mt-0.5">💬 ${tr.obs}</p>` : ''}
               </div>
-              <div class="flex items-center gap-2 flex-wrap">
+
+              <!-- CONTROLES GLOBALES DE TIEMPO DE ESTE TRABAJO -->
+              <div class="flex items-center gap-2">
                 ${botonTiempoHTML}
-                <button onclick="openVincularModal(${tr.id})" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition" title="Vincular trabajadores a este trabajo">
-                  + Vincular
-                </button>
               </div>
             </div>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              ${integrantes.length === 0 ? `<p class="text-xs text-gray-400 col-span-2 italic">Sin personal asignado. Haz clic en "+ Vincular" para añadir personas.</p>` : ''}
-              
-              ${integrantes.map(t => {
-                const notaTrabajador = obsDia[t.id] || '';
-                return `
-                  <div class="${tr.activo ? 'bg-indigo-50/70 border-indigo-300' : 'bg-gray-50 border-gray-200'} border p-3 rounded-lg relative flex justify-between items-center">
-                    <button onclick="event.stopPropagation(); openMoverModal(${t.id}, ${tr.id})" title="Desvincular" class="absolute top-2 right-2 w-6 h-6 bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-full text-gray-400 flex items-center justify-center font-bold text-xs transition shadow-sm z-10">
-                      ✕
-                    </button>
 
-                    <div onclick="event.stopPropagation(); openObsPersonaModal(${t.id})" class="flex items-center space-x-3 cursor-pointer group pr-6">
-                      <div class="w-9 h-9 ${tr.activo ? 'bg-indigo-600' : 'bg-gray-400'} text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0">
-                        ${t.nombre.split(' ').map(n=>n[0]).join('').substring(0, 2)}
-                      </div>
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                          <p class="font-semibold text-sm text-gray-800 group-hover:text-indigo-600 transition">${t.nombre}</p>
-                          <span class="text-[10px] px-1.5 py-0.2 rounded font-bold ${tr.activo ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : (tr.enPausa30 ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-200 text-gray-700 border border-gray-300')}">
-                            ${tr.activo ? 'En Curso' : (tr.enPausa30 ? 'Pausa 30m' : 'Pausado')}
-                          </span>
-                        </div>
-                        <p class="text-[10px] text-gray-500 font-medium">
-                          ${tr.activo ? '⏱️ Tiempo corriendo para el equipo' : (tr.enPausa30 ? '☕ En descanso de 30m' : '⏳ Esperando inicio')}
-                        </p>
-                        ${notaTrabajador ? `<p class="text-[10px] text-amber-700 italic truncate max-w-[150px]">💬 ${notaTrabajador}</p>` : ''}
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
+            <!-- FILA INTERMEDIA: NOMBRES VISIBLES DESDE FUERA (SOLO LECTURA) -->
+            <div class="my-3">
+              <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Personal asignado a este cometido:</p>
+              <div class="flex flex-wrap gap-1.5">
+                ${etiquetasNombresHTML}
+              </div>
+            </div>
+
+            <!-- FILA INFERIOR: BOTÓN PARA ABRIR Y ACTUAR -->
+            <div class="mt-3 pt-2">
+              <button onclick="openGestionTrabajoModal(${tr.id})" class="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5">
+                <span>⚙️</span> Entrar al trabajo / Gestionar personas y notas
+              </button>
             </div>
           </div>
         `;
       }).join('');
+    }
+
+    // MODAL NIVEL INTERIOR: PARA ACTUAR PERSONA POR PERSONA
+    function openGestionTrabajoModal(trabajoId) {
+      trabajoSeleccionadoId = trabajoId;
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === trabajoId);
+      if (!tr) return;
+
+      document.getElementById('modalGestionNombre').innerText = tr.nombre;
+      document.getElementById('inputGestionObsTrabajo').value = tr.obs || '';
+
+      renderListaGestionTrabajadores();
+
+      document.getElementById('gestionTrabajoModal').classList.remove('hidden');
+      document.getElementById('gestionTrabajoModal').classList.add('flex');
+    }
+
+    function closeGestionTrabajoModal() {
+      document.getElementById('gestionTrabajoModal').classList.add('hidden');
+      document.getElementById('gestionTrabajoModal').classList.remove('flex');
+    }
+
+    function renderListaGestionTrabajadores() {
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
+      if (!tr) return;
+
+      const obsDia = obtenerObservacionesDiaActual();
+      const integrantes = (tr.asignadosIds || []).map(id => trabajadores.find(t => t.id === id)).filter(Boolean);
+
+      document.getElementById('modalGestionCount').innerText = integrantes.length;
+
+      const cont = document.getElementById('listaGestionTrabajadores');
+
+      if (integrantes.length === 0) {
+        cont.innerHTML = `<p class="text-xs text-gray-400 italic text-center py-6">Sin personal asignado a este trabajo. Haz clic en "+ Vincular Más Personal".</p>`;
+        return;
+      }
+
+      cont.innerHTML = integrantes.map(t => {
+        const notaTrabajador = obsDia[t.id] || '';
+        return `
+          <div class="bg-gray-50 border border-gray-200 p-3 rounded-lg flex justify-between items-center gap-3">
+            <div class="flex items-center space-x-3 flex-1 min-w-0">
+              <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                ${t.nombre.split(' ').map(n=>n[0]).join('').substring(0, 2)}
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="font-bold text-xs text-gray-800 truncate">${t.nombre}</p>
+                ${notaTrabajador ? `<p class="text-[10px] text-amber-700 italic truncate">💬 ${notaTrabajador}</p>` : `<p class="text-[10px] text-gray-400 italic">Sin observaciones</p>`}
+              </div>
+            </div>
+
+            <!-- BOTONES PARA ACTUAR SOBRE CADA TRABAJADOR -->
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="openObsPersonaModal(${t.id})" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold rounded-lg transition" title="Añadir notas/observaciones">
+                📝 Notas
+              </button>
+              <button onclick="desvincularPersonaDesdeModal(${t.id})" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-semibold rounded-lg transition" title="Quitar de este trabajo">
+                ✕ Desvincular
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function desvincularPersonaDesdeModal(personaId) {
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
+
+      if (tr && tr.asignadosIds) {
+        const tiempoInvertido = (tr.duracionMin * 60) - tr.tiempoRestanteSec;
+        registrarTiempoEnNota(personaId, tr.nombre, tiempoInvertido, 'Desvinculado');
+        tr.asignadosIds = tr.asignadosIds.filter(id => id !== personaId);
+        
+        guardarDatos();
+        renderListaGestionTrabajadores();
+        renderTrabajos();
+      }
+    }
+
+    function guardarObsTrabajoDesdeModal() {
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
+      if (tr) {
+        tr.obs = document.getElementById('inputGestionObsTrabajo').value.trim();
+        guardarDatos();
+        renderTrabajos();
+      }
+    }
+
+    function openVincularModalDesdeGestion() {
+      openVincularModal(trabajoSeleccionadoId);
     }
 
     function toggleTimerTrabajo(id) {
@@ -515,7 +599,6 @@
         tr.activo = !tr.activo;
 
         if (!tr.activo) {
-          // Se pausó manualmente el trabajo -> Registramos el tiempo en las notas de todos los asignados
           const tiempoInvertido = (tr.duracionMin * 60) - tr.tiempoRestanteSec;
           tr.asignadosIds.forEach(trabajadorId => {
             registrarTiempoEnNota(trabajadorId, tr.nombre, tiempoInvertido, 'Pausado manualmente');
@@ -564,7 +647,6 @@
       }
     }
 
-    // MODAL VINCULAR DESDE EL TRABAJO
     function openVincularModal(trabajoId) {
       trabajoSeleccionadoId = trabajoId;
       const trabajosHoy = obtenerTrabajosDelDiaActual();
@@ -618,10 +700,15 @@
 
       guardarDatos();
       closeVincularModal();
+      
+      // Si el modal de gestión estaba abierto, se refresca su lista interna
+      if (!document.getElementById('gestionTrabajoModal').classList.contains('hidden')) {
+        renderListaGestionTrabajadores();
+      }
+      
       renderApp();
     }
 
-    // MODAL SELECCIONAR TRABAJOS DEL DÍA
     function openSeleccionTrabajosModal() {
       document.getElementById('modalFechaTitulo').innerText = fechaSeleccionada;
       const contenedor = document.getElementById('listaCheckTrabajos');
@@ -686,35 +773,6 @@
       renderApp();
     }
 
-    function openMoverModal(personaId, trabajoActualId) {
-      seleccionadoId = { personaId, trabajoActualId };
-      const t = trabajadores.find(x => x.id === personaId);
-      document.getElementById('modalMoverNombre').innerText = t.nombre;
-
-      document.getElementById('moverModal').classList.remove('hidden');
-      document.getElementById('moverModal').classList.add('flex');
-    }
-
-    function closeMoverModal() {
-      document.getElementById('moverModal').classList.add('hidden');
-      document.getElementById('moverModal').classList.remove('flex');
-    }
-
-    function accionDesvincular() {
-      const { personaId, trabajoActualId } = seleccionadoId;
-      const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const tr = trabajosHoy.find(x => x.id === trabajoActualId);
-
-      if (tr && tr.asignadosIds) {
-        const tiempoInvertido = (tr.duracionMin * 60) - tr.tiempoRestanteSec;
-        registrarTiempoEnNota(personaId, tr.nombre, tiempoInvertido, 'Desvinculado');
-        tr.asignadosIds = tr.asignadosIds.filter(id => id !== personaId);
-      }
-      guardarDatos();
-      closeMoverModal();
-      renderApp();
-    }
-
     function openObsPersonaModal(id) {
       seleccionadoId = id;
       const t = trabajadores.find(x => x.id === id);
@@ -768,34 +826,12 @@
 
       guardarDatos();
       closeObsPersonaModal();
-      renderApp();
-    }
 
-    function openObsTrabajoModal(id) {
-      trabajoSeleccionadoId = id;
-      const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const tr = trabajosHoy.find(x => x.id === id);
-      document.getElementById('modalTrabajoNombre').innerText = tr.nombre;
-      document.getElementById('obsTrabajoInput').value = tr.obs || '';
-
-      document.getElementById('obsTrabajoModal').classList.remove('hidden');
-      document.getElementById('obsTrabajoModal').classList.add('flex');
-    }
-
-    function closeObsTrabajoModal() {
-      document.getElementById('obsTrabajoModal').classList.add('hidden');
-      document.getElementById('obsTrabajoModal').classList.remove('flex');
-    }
-
-    function guardarObsTrabajo() {
-      const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
-      if (tr) {
-        tr.obs = document.getElementById('obsTrabajoInput').value;
-        guardarDatos();
-        renderTrabajos();
-        closeObsTrabajoModal();
+      if (!document.getElementById('gestionTrabajoModal').classList.contains('hidden')) {
+        renderListaGestionTrabajadores();
       }
+
+      renderApp();
     }
 
     function openAsignarModal(id) {
