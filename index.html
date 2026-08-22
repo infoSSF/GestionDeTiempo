@@ -33,8 +33,8 @@
           <select id="selectTrabajo" class="border p-2 rounded w-full"></select>
         </div>
         <div>
-          <label class="block font-medium mb-1">Seleccionar Trabajador(es):</label>
-          <div id="listaTrabajadoresCheck" class="border p-3 rounded max-h-40 overflow-y-auto space-y-1"></div>
+          <label class="block font-medium mb-1">Seleccionar Trabajador(es): <span class="text-xs text-gray-500">(Puedes marcar varios)</span></label>
+          <div id="listaTrabajadoresCheck" class="border p-3 rounded max-h-40 overflow-y-auto space-y-2 bg-gray-50"></div>
         </div>
         <div>
           <label class="block font-medium mb-1">Observaciones:</label>
@@ -92,9 +92,18 @@
           <label class="block font-medium mb-1">Trabajador:</label>
           <select id="selectTrabajadorComentario" class="border p-2 rounded w-full"></select>
         </div>
+        
+        <!-- Selector rápido de notas predefinidas -->
+        <div id="contenedorNotasRapidasUI" class="hidden">
+          <label class="block font-medium mb-1 text-sm text-indigo-600">O seleccionar nota rápida predefinida:</label>
+          <select id="selectNotaRapidaUI" onchange="usarNotaRapida()" class="border p-2 rounded w-full bg-indigo-50 text-indigo-900 text-sm">
+            <option value="">-- Elige una nota rápida opcional --</option>
+          </select>
+        </div>
+
         <div>
-          <label class="block font-medium mb-1">Comentario:</label>
-          <textarea id="textoComentario" class="border p-2 rounded w-full" rows="3" placeholder="Nota rápida..."></textarea>
+          <label class="block font-medium mb-1">Comentario / Nota:</label>
+          <textarea id="textoComentario" class="border p-2 rounded w-full" rows="3" placeholder="Nota rápida o personalizada..."></textarea>
         </div>
         <button onclick="guardarComentario()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">
           Guardar Comentario
@@ -106,17 +115,17 @@
     <!-- AJUSTES -->
     <section id="ajustes" class="pantalla hidden">
       <h1 class="text-2xl font-bold mb-4">Configuración y Gestión</h1>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         <!-- Gestión Trabajos -->
         <div class="bg-white p-6 rounded shadow">
           <h2 class="text-xl font-bold mb-3">Trabajos</h2>
           <div class="space-y-2 mb-4">
             <input type="text" id="nombreTrabajo" placeholder="Nombre del trabajo" class="border p-2 rounded w-full">
-            <input type="number" id="tiempoTrabajo" placeholder="Tiempo teórico (minutos)" class="border p-2 rounded w-full">
+            <input type="number" id="tiempoTrabajo" placeholder="Tiempo teórico (min)" class="border p-2 rounded w-full">
             <button onclick="addTrabajo()" class="bg-blue-600 text-white w-full py-2 rounded font-bold hover:bg-blue-700">Añadir Trabajo</button>
           </div>
-          <ul id="listaTrabajos" class="divide-y"></ul>
+          <ul id="listaTrabajos" class="divide-y text-sm"></ul>
         </div>
 
         <!-- Gestión Trabajadores -->
@@ -126,7 +135,17 @@
             <input type="text" id="nombreTrabajador" placeholder="Nombre completo" class="border p-2 rounded w-full">
             <button onclick="addTrabajador()" class="bg-blue-600 text-white w-full py-2 rounded font-bold hover:bg-blue-700">Añadir Trabajador</button>
           </div>
-          <ul id="listaTrabajadores" class="divide-y"></ul>
+          <ul id="listaTrabajadores" class="divide-y text-sm"></ul>
+        </div>
+
+        <!-- Gestión Notas Rápidas -->
+        <div class="bg-white p-6 rounded shadow">
+          <h2 class="text-xl font-bold mb-3">Notas Rápidas</h2>
+          <div class="space-y-2 mb-4">
+            <input type="text" id="textoNotaRapida" placeholder="Ej: Revisión correcta" class="border p-2 rounded w-full">
+            <button onclick="addNotaRapida()" class="bg-blue-600 text-white w-full py-2 rounded font-bold hover:bg-blue-700">Añadir Nota Rápida</button>
+          </div>
+          <ul id="listaNotasRapidas" class="divide-y text-sm"></ul>
         </div>
 
       </div>
@@ -147,7 +166,7 @@
           Enviar Resumen por Email (Automático)
         </button>
         <button onclick="abrirClienteMail()" class="bg-gray-200 text-gray-800 py-2 rounded font-bold hover:bg-gray-300">
-          Abrir App de Correo (Adjuntar Excel manualmente)
+          Abrir App de Correo (Adjuntar Excel)
         </button>
         <button onclick="cerrarModalEmail()" class="text-red-600 mt-2 hover:underline text-sm">
           Cancelar
@@ -157,7 +176,6 @@
   </div>
 
   <script>
-    // Configuración Inicial de EmailJS (Opcional - reemplaza con tus claves de emailjs.com)
     (function(){
       emailjs.init("TU_PUBLIC_KEY_AQUI");
     })();
@@ -165,6 +183,7 @@
     let DB = JSON.parse(localStorage.getItem('appData')) || {
       trabajos: [],
       trabajadores: [],
+      notasRapidas: [],
       registros: [],
       comentarios: []
     };
@@ -218,13 +237,31 @@
       guardarDB();
     }
 
+    function addNotaRapida() {
+      const texto = document.getElementById('textoNotaRapida').value.trim();
+      if(texto) {
+        DB.notasRapidas.push({ id: Date.now(), texto });
+        document.getElementById('textoNotaRapida').value = '';
+        guardarDB();
+      }
+    }
+
+    function delNotaRapida(id) {
+      DB.notasRapidas = DB.notasRapidas.filter(n => n.id !== id);
+      guardarDB();
+    }
+
     function cargarAjustes() {
       document.getElementById('listaTrabajos').innerHTML = DB.trabajos.map(t => 
-        `<li class="py-2 flex justify-between items-center">${t.nombre} (${t.tiempo} min) <button onclick="delTrabajo(${t.id})" class="text-red-600 font-bold">X</button></li>`
+        `<li class="py-2 flex justify-between items-center">${t.nombre} (${t.tiempo} min) <button onclick="delTrabajo(${t.id})" class="text-red-600 font-bold px-2">X</button></li>`
       ).join('');
       
       document.getElementById('listaTrabajadores').innerHTML = DB.trabajadores.map(t => 
-        `<li class="py-2 flex justify-between items-center">${t.nombre} <button onclick="delTrabajador(${t.id})" class="text-red-600 font-bold">X</button></li>`
+        `<li class="py-2 flex justify-between items-center">${t.nombre} <button onclick="delTrabajador(${t.id})" class="text-red-600 font-bold px-2">X</button></li>`
+      ).join('');
+
+      document.getElementById('listaNotasRapidas').innerHTML = DB.notasRapidas.map(n => 
+        `<li class="py-2 flex justify-between items-center">${n.texto} <button onclick="delNotaRapida(${n.id})" class="text-red-600 font-bold px-2">X</button></li>`
       ).join('');
     }
 
@@ -234,9 +271,10 @@
         `<option value="${t.id}">${t.nombre} (${t.tiempo} min)</option>`
       ).join('');
 
-      document.getElementById('listaTrabajadoresCheck').innerHTML = DB.trabajadores.map(t => 
-        `<label class="flex items-center gap-2"><input type="checkbox" value="${t.nombre}"> ${t.nombre}</label>`
-      ).join('');
+      // Renderiza los checkboxes de selección múltiple de trabajadores
+      document.getElementById('listaTrabajadoresCheck').innerHTML = DB.trabajadores.length > 0 
+        ? DB.trabajadores.map(t => `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="${t.nombre}" class="rounded text-blue-600 w-4 h-4"> ${t.nombre}</label>`).join('')
+        : '<p class="text-gray-400 text-sm italic">No hay trabajadores añadidos en Ajustes.</p>';
     }
 
     function iniciarContador() {
@@ -263,6 +301,7 @@
       clearInterval(timerId);
       document.getElementById('panelTimer').classList.add('hidden');
 
+      // Captura múltiples trabajadores seleccionados
       const seleccionados = Array.from(document.querySelectorAll('#listaTrabajadoresCheck input:checked')).map(c => c.value);
       
       const nuevoRegistro = {
@@ -276,6 +315,9 @@
       DB.registros.push(nuevoRegistro);
       guardarDB();
       document.getElementById('obsDia').value = '';
+      
+      // Desmarcar checkboxes después de guardar
+      document.querySelectorAll('#listaTrabajadoresCheck input').forEach(cb => cb.checked = false);
       alert("Trabajo guardado en el historial");
     }
 
@@ -300,7 +342,7 @@
       XLSX.writeFile(wb, `Reporte_Jornada_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    // --- FUNCIONES DE ENVÍO DE CORREO ---
+    // --- CORREO ---
     function abrirModalEmail() {
       if(DB.registros.length === 0) return alert("No hay datos cargados para enviar");
       document.getElementById('modalEmail').classList.remove('hidden');
@@ -310,12 +352,10 @@
       document.getElementById('modalEmail').classList.add('hidden');
     }
 
-    // Método 1: Apertura directa del cliente de correo por defecto
     function abrirClienteMail() {
       const email = document.getElementById('emailDestino').value;
       if(!email) return alert("Introduce una dirección de correo");
 
-      // Exporta automáticamente el archivo Excel para adjuntar
       exportarExcel();
 
       let textoResumen = "Resumen del día:\n\n";
@@ -330,7 +370,6 @@
       cerrarModalEmail();
     }
 
-    // Método 2: Envío automático mediante servicio EmailJS
     function enviarCorreoEmailJS() {
       const email = document.getElementById('emailDestino').value;
       if(!email) return alert("Introduce un correo de destino");
@@ -339,28 +378,38 @@
         `Fecha: ${r.fecha} - Trabajo: ${r.trabajo} (${r.tiempo}) - Personal: ${r.trabajadores} - Obs: ${r.observaciones}`
       ).join("\n");
 
-      // Parámetros para tu plantilla en EmailJS
       const templateParams = {
         to_email: email,
         subject: `Reporte de Trabajo ${new Date().toLocaleDateString()}`,
         message: resumen
       };
 
-      // Si no has puesto las claves te mostrará una alerta indicativa
       emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
         .then(function() {
            alert('¡Correo enviado con éxito!');
            cerrarModalEmail();
         }, function(error) {
-           alert('Para activar el envío directo, configura tus claves gratuitas de EmailJS. Por ahora usa la opción "Abrir App de Correo".');
+           alert('Para activar el envío directo, configura tus claves de EmailJS. Usa la opción de abrir app de correo.');
         });
     }
 
-    // --- COMENTARIOS ---
+    // --- COMENTARIOS Y NOTAS RÁPIDAS ---
     function cargarComentarios() {
       document.getElementById('selectTrabajadorComentario').innerHTML = DB.trabajadores.map(t => 
         `<option value="${t.nombre}">${t.nombre}</option>`
       ).join('');
+
+      // Carga el selector de notas rápidas en la pantalla de comentarios
+      const selectNota = document.getElementById('selectNotaRapidaUI');
+      const contenedorNotas = document.getElementById('contenedorNotasRapidasUI');
+      
+      if(DB.notasRapidas.length > 0) {
+        contenedorNotas.classList.remove('hidden');
+        selectNota.innerHTML = `<option value="">-- Selecciona una nota rápida predefinida --</option>` + 
+          DB.notasRapidas.map(n => `<option value="${n.texto}">${n.texto}</option>`).join('');
+      } else {
+        contenedorNotas.classList.add('hidden');
+      }
 
       document.getElementById('listaComentarios').innerHTML = DB.comentarios.map(c => `
         <div class="bg-white p-3 rounded shadow">
@@ -368,6 +417,13 @@
           <p class="text-gray-700 mt-1">${c.texto}</p>
         </div>
       `).join('');
+    }
+
+    function usarNotaRapida() {
+      const notaSeleccionada = document.getElementById('selectNotaRapidaUI').value;
+      if(notaSeleccionada) {
+        document.getElementById('textoComentario').value = notaSeleccionada;
+      }
     }
 
     function guardarComentario() {
@@ -380,6 +436,7 @@
           texto
         });
         document.getElementById('textoComentario').value = '';
+        document.getElementById('selectNotaRapidaUI').value = '';
         guardarDB();
         cargarComentarios();
       }
