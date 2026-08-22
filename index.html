@@ -63,7 +63,7 @@
         <h3 class="text-base font-bold text-gray-800">Seleccionar Trabajos para hoy (<span id="modalFechaTitulo">--</span>)</h3>
         <button onclick="closeSeleccionTrabajosModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
       </div>
-      <p class="text-xs text-gray-500 my-3">Selecciona qué trabajos se van a realizar en la fecha seleccionada. Al cambiar de día, la lista se vaciará para programarla de nuevo.</p>
+      <p class="text-xs text-gray-500 my-3">Selecciona qué trabajos de tu catálogo se van a realizar en la fecha seleccionada. Al cambiar de día, las asignaciones se vaciarán para programarlas de nuevo sin perder tu personal ni tus catálogos.</p>
       
       <div id="listaCheckTrabajos" class="space-y-2 my-4 max-h-60 overflow-y-auto border border-gray-200 p-3 rounded-lg"></div>
 
@@ -222,11 +222,16 @@
   <script>
     let fechaSeleccionada = new Date().toISOString().split('T')[0];
 
-    // ESTRUCTURAS DE DATOS
-    let notasRapidas = [];
-    let trabajadores = []; // { id, nombre, obs }
-    let catalogoTrabajos = []; // { id, nombre, duracionMin }
-    let programacionPorDia = {}; // { "YYYY-MM-DD": [ { id, catalogoId, nombre, duracionMin, tiempoRestanteSec, activo, obs } ] }
+    // ESTRUCTURAS DE DATOS (Guardadas en localStorage para persistencia)
+    let notasRapidas = JSON.parse(localStorage.getItem('gp_notas')) || [];
+    let trabajadores = JSON.parse(localStorage.getItem('gp_trabajadores')) || []; 
+    // trabajadores: { id, nombre, obs }
+    
+    let catalogoTrabajos = JSON.parse(localStorage.getItem('gp_catalogo')) || []; 
+    // catalogoTrabajos: { id, nombre, duracionMin }
+
+    let programacionPorDia = JSON.parse(localStorage.getItem('gp_programacion')) || {}; 
+    // programacionPorDia: { "YYYY-MM-DD": [ { id, catalogoId, nombre, duracionMin, tiempoRestanteSec, activo, obs, asignadosIds: [idTrabajador, ...] } ] }
 
     let seleccionadoId = null;
     let trabajoSeleccionadoId = null;
@@ -234,9 +239,15 @@
 
     document.getElementById('fechaPlan').value = fechaSeleccionada;
 
+    function guardarDatos() {
+      localStorage.setItem('gp_notas', JSON.stringify(notasRapidas));
+      localStorage.setItem('gp_trabajadores', JSON.stringify(trabajadores));
+      localStorage.setItem('gp_catalogo', JSON.stringify(catalogoTrabajos));
+      localStorage.setItem('gp_programacion', JSON.stringify(programacionPorDia));
+    }
+
     function cambiarFecha() {
       fechaSeleccionada = document.getElementById('fechaPlan').value;
-      // Al cambiar de fecha, si no hay trabajos programados para ese día, la lista se queda vacía (cada día se programa desde cero)
       renderApp();
     }
 
@@ -255,7 +266,10 @@
             cambiado = true;
           }
         });
-        if (cambiado) renderTrabajos();
+        if (cambiado) {
+          guardarDatos();
+          renderTrabajos();
+        }
       }, 1000);
     }
 
@@ -274,28 +288,24 @@
     function renderDisponibles() {
       const lista = document.getElementById('listaDisponibles');
       const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const idsTrabajosHoy = trabajosHoy.map(t => t.id);
 
-      // Un trabajador está disponible si no tiene asignado un trabajo del día actual
-      const disponibles = trabajadores.filter(t => t.trabajoIdDia !== fechaSeleccionada || !idsTrabajosHoy.includes(t.trabajoActualId));
-      
-      // Limpiar asignaciones huérfanas si el trabajo ya no está en el día
-      trabajadores.forEach(t => {
-        if (t.trabajoIdDia === fechaSeleccionada && !idsTrabajosHoy.includes(t.trabajoActualId)) {
-          t.trabajoActualId = null;
-          t.trabajoIdDia = null;
+      // Recopilar IDs de trabajadores que ya están ocupados en algún trabajo del día actual
+      let ocupadosHoyIds = [];
+      trabajosHoy.forEach(tr => {
+        if (tr.asignadosIds) {
+          ocupadosHoyIds = ocupadosHoyIds.concat(tr.asignadosIds);
         }
       });
 
-      const actualesDisponibles = trabajadores.filter(t => !t.trabajoActualId || t.trabajoIdDia !== fechaSeleccionada);
-      document.getElementById('countDisponibles').innerText = `${actualesDisponibles.length} Disponibles`;
+      const disponibles = trabajadores.filter(t => !ocupadosHoyIds.includes(t.id));
+      document.getElementById('countDisponibles').innerText = `${disponibles.length} Disponibles`;
 
-      if (actualesDisponibles.length === 0) {
-        lista.innerHTML = `<p class="text-xs text-gray-400 text-center py-8">No hay personal disponible. Añade trabajadores desde Ajustes ⚙️.</p>`;
+      if (disponibles.length === 0) {
+        lista.innerHTML = `<p class="text-xs text-gray-400 text-center py-8">No hay personal disponible para hoy. Todos están asignados o añade personal desde Ajustes ⚙️.</p>`;
         return;
       }
 
-      lista.innerHTML = actualesDisponibles.map(t => `
+      lista.innerHTML = disponibles.map(t => `
         <div class="bg-emerald-50/50 border border-emerald-200 p-3 rounded-lg flex justify-between items-center">
           <div class="flex items-center space-x-3 cursor-pointer group" onclick="openObsPersonaModal(${t.id})" title="Haz clic para observaciones">
             <div class="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
@@ -323,7 +333,8 @@
       }
 
       contenedor.innerHTML = trabajosHoy.map(tr => {
-        const integrantes = trabajadores.filter(t => t.trabajoActualId === tr.id && t.trabajoIdDia === fechaSeleccionada);
+        if (!tr.asignadosIds) tr.asignadosIds = [];
+        const integrantes = trabajadores.filter(t => tr.asignadosIds.includes(t.id));
 
         let botonTiempoHTML = '';
         if (!tr.activo && tr.tiempoRestanteSec > 0) {
@@ -357,7 +368,7 @@
               ${integrantes.length === 0 ? `<p class="text-xs text-gray-400 col-span-2 italic">Sin personal asignado</p>` : ''}
               ${integrantes.map(t => `
                 <div class="bg-gray-50 border border-gray-200 p-3 rounded-lg relative flex justify-between items-center">
-                  <button onclick="event.stopPropagation(); openMoverModal(${t.id})" title="Desvincular o mover" class="absolute top-2 right-2 w-6 h-6 bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-full text-gray-400 flex items-center justify-center font-bold text-xs transition shadow-sm z-10">
+                  <button onclick="event.stopPropagation(); openMoverModal(${t.id}, ${tr.id})" title="Desvincular o mover" class="absolute top-2 right-2 w-6 h-6 bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-full text-gray-400 flex items-center justify-center font-bold text-xs transition shadow-sm z-10">
                     ✕
                   </button>
 
@@ -381,7 +392,8 @@
     function toggleTimerTrabajo(id) {
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const tr = trabajosHoy.find(x => x.id === id);
-      if (tr) tr.activo = true;
+      if (tr) tr.activo = !tr.activo;
+      guardarDatos();
       renderTrabajos();
     }
 
@@ -392,6 +404,7 @@
       if (confirm(`¿Deseas finalizar el trabajo "${tr.nombre}"?`)) {
         tr.activo = false;
         tr.tiempoRestanteSec = 0;
+        guardarDatos();
         renderTrabajos();
       }
     }
@@ -433,7 +446,7 @@
 
       let trabajosHoyActuales = programacionPorDia[fechaSeleccionada] || [];
 
-      // Construir nueva lista manteniendo los estados/tiempos si ya existían
+      // Construir nueva lista para este día, conservando los datos si ya estaban añadidos
       let nuevaLista = [];
       seleccionadosIds.forEach(catId => {
         let existente = trabajosHoyActuales.find(t => t.catalogoId === catId);
@@ -448,30 +461,36 @@
             duracionMin: catItem.duracionMin,
             tiempoRestanteSec: catItem.duracionMin * 60,
             activo: false,
-            obs: ""
+            obs: "",
+            asignadosIds: []
           });
         }
       });
 
       programacionPorDia[fechaSeleccionada] = nuevaLista;
+      guardarDatos();
       closeSeleccionTrabajosModal();
       renderApp();
     }
 
-    function openMoverModal(id) {
-      seleccionadoId = id;
-      const t = trabajadores.find(x => x.id === id);
+    let trabajoOrigenIdGlobal = null;
+
+    function openMoverModal(personaId, trabajoActualId) {
+      seleccionadoId = personaId;
+      trabajoOrigenIdGlobal = trabajoActualId;
+      const t = trabajadores.find(x => x.id === personaId);
       document.getElementById('modalMoverNombre').innerText = t.nombre;
 
       const tbody = document.getElementById('tablaReasignacionBody');
       const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const otrosTrabajos = trabajosHoy.filter(tr => tr.id !== t.trabajoActualId);
+      const otrosTrabajos = trabajosHoy.filter(tr => tr.id !== trabajoActualId);
 
       if (otrosTrabajos.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-gray-400 italic">No hay otros trabajos programados para hoy</td></tr>`;
       } else {
         tbody.innerHTML = otrosTrabajos.map(tr => {
-          const miembros = trabajadores.filter(x => x.trabajoActualId === tr.id && x.trabajoIdDia === fechaSeleccionada);
+          if (!tr.asignadosIds) tr.asignadosIds = [];
+          const miembros = trabajadores.filter(x => tr.asignadosIds.includes(x.id));
           const nombresTexto = miembros.length > 0 
             ? miembros.map(m => m.nombre).join(', ')
             : '<span class="text-gray-400 italic">Sin integrantes</span>';
@@ -501,21 +520,32 @@
     }
 
     function accionDesvincular() {
-      const t = trabajadores.find(x => x.id === seleccionadoId);
-      if (t) {
-        t.trabajoActualId = null;
-        t.trabajoIdDia = null;
-      }
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      trabajosHoy.forEach(tr => {
+        if (tr.asignadosIds) {
+          tr.asignadosIds = tr.asignadosIds.filter(id => id !== seleccionadoId);
+        }
+      });
+      guardarDatos();
       closeMoverModal();
       renderApp();
     }
 
     function accionReasignar(nuevoTrabajoId) {
-      const t = trabajadores.find(x => x.id === seleccionadoId);
-      if (t) {
-        t.trabajoActualId = nuevoTrabajoId;
-        t.trabajoIdDia = fechaSeleccionada;
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      // Quitar de cualquier trabajo anterior en el día
+      trabajosHoy.forEach(tr => {
+        if (tr.asignadosIds) {
+          tr.asignadosIds = tr.asignadosIds.filter(id => id !== seleccionadoId);
+        }
+      });
+      // Añadir al nuevo trabajo
+      const destino = trabajosHoy.find(tr => tr.id === nuevoTrabajoId);
+      if (destino) {
+        if (!destino.asignadosIds) destino.asignadosIds = [];
+        destino.asignadosIds.push(seleccionadoId);
       }
+      guardarDatos();
       closeMoverModal();
       renderApp();
     }
@@ -559,6 +589,7 @@
       const t = trabajadores.find(x => x.id === seleccionadoId);
       if (t) {
         t.obs = document.getElementById('obsPersonaInput').value;
+        guardarDatos();
         closeObsPersonaModal();
         renderApp();
       }
@@ -585,6 +616,7 @@
       const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
       if (tr) {
         tr.obs = document.getElementById('obsTrabajoInput').value;
+        guardarDatos();
         renderTrabajos();
         closeObsTrabajoModal();
       }
@@ -667,20 +699,23 @@
       if (txt) {
         notasRapidas.push(txt);
         document.getElementById('nuevaNotaTexto').value = '';
+        guardarDatos();
         renderAjustesListas();
       }
     }
 
     function eliminarNotaRapida(index) {
       notasRapidas.splice(index, 1);
+      guardarDatos();
       renderAjustesListas();
     }
 
     function crearTrabajador(e) {
       e.preventDefault();
       const nombre = document.getElementById('nuevoNombre').value;
-      trabajadores.push({ id: Date.now(), nombre, trabajoActualId: null, trabajoIdDia: null, obs: "" });
+      trabajadores.push({ id: Date.now(), nombre, obs: "" });
       document.getElementById('nuevoNombre').value = '';
+      guardarDatos();
       renderAjustesListas();
       renderApp();
     }
@@ -688,6 +723,7 @@
     function eliminarDelSistema(id) {
       if (confirm("¿Confirmas eliminar a esta persona del sistema?")) {
         trabajadores = trabajadores.filter(t => t.id !== id);
+        guardarDatos();
         renderAjustesListas();
         renderApp();
       }
@@ -700,12 +736,14 @@
       catalogoTrabajos.push({ id: Date.now(), nombre, duracionMin: mins });
       document.getElementById('nuevoTrabajoNombre').value = '';
       document.getElementById('nuevoTrabajoMinutos').value = '';
+      guardarDatos();
       renderAjustesListas();
     }
 
     function eliminarTrabajoCatalogo(id) {
       if (confirm("¿Eliminar este trabajo del catálogo general?")) {
         catalogoTrabajos = catalogoTrabajos.filter(tr => tr.id !== id);
+        guardarDatos();
         renderAjustesListas();
       }
     }
