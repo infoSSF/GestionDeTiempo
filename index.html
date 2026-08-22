@@ -318,11 +318,13 @@
       }
     }
 
+    /* LÓGICA DE EXCESO INDIVIDUAL CORREGIDA */
     function actualizarTiemposExceso() {
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const ahora = Date.now();
 
       trabajadores.forEach(t => {
+        // Un trabajador está activo SI Y SOLO SI está en la lista de asignados ACTUALES de una tarea activa o en pausa
         const estaEnTrabajoActivoOPausa = trabajosHoy.some(tr => 
           (tr.activo || tr.enPausa30) && tr.asignadosIds && tr.asignadosIds.includes(t.id)
         );
@@ -330,8 +332,11 @@
         if (estaEnTrabajoActivoOPausa) {
           delete inicioExcesoPorPersona[t.id];
         } else {
+          // Si no está asignado actualmente a una tarea activa, comprobamos si ha registrado actividad previamente hoy
           const haTrabajadoPreviamente = trabajosHoy.some(tr => 
-            tr.iniciadoAlgunaVez && tr.historialAsignados && tr.historialAsignados.includes(t.id)
+            tr.iniciadoAlgunaVez && 
+            ((tr.historialAsignados && tr.historialAsignados.includes(t.id)) || 
+             (tr.tiemposTrabajadores && tr.tiemposTrabajadores[t.id] > 0))
           );
 
           if (haTrabajadoPreviamente) {
@@ -516,7 +521,6 @@
         return;
       }
 
-      // Mapa para procesar tiempos totales por persona y desglose por trabajos
       const datosPorPersona = {};
 
       trabajadores.forEach(t => {
@@ -561,7 +565,6 @@
         return;
       }
 
-      // Generación de la Tabla Resumen Simplificada
       const filasTablaHTML = personasConActividad.map(p => {
         const desgloseTrabajosHTML = p.trabajos.map(t => `
           <div class="flex justify-between items-center bg-white px-2.5 py-1 rounded border border-gray-100 text-xs mb-1">
@@ -604,7 +607,6 @@
         </div>
       `;
 
-      // Generación de Notas e Historial por Trabajo
       const historialNotasHTML = trabajosHoy.map(tr => {
         if (!tr.historialAsignados) tr.historialAsignados = [];
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
