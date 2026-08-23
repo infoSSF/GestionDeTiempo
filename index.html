@@ -131,7 +131,7 @@
         <h3 class="text-base font-bold text-gray-800">Añadir Personal a: <span id="modalTrabajoVincularNombre" class="text-indigo-600">--</span></h3>
         <button onclick="closeVincularModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
       </div>
-      <p class="text-xs text-gray-500 my-3">Selecciona o quita los trabajadores asignados a este trabajo.</p>
+      <p class="text-xs text-gray-500 my-3">Selecciona los trabajadores. Si una persona ya está asignada a otra tarea, se desvinculará de la anterior automáticamente.</p>
 
       <div id="listaCheckPersonalVincular" class="space-y-2 my-4 max-h-60 overflow-y-auto border border-gray-200 p-3 rounded-lg"></div>
 
@@ -282,6 +282,7 @@
       trabajo.tiempoRestanteSec = 0;
       trabajo.activo = false;
       trabajo.iniciadoAlgunaVez = true;
+      trabajo.asignadosIds = []; // Liberar personal al finalizar la tarea
     }
 
     function iniciarTodosLosTrabajos() {
@@ -318,13 +319,11 @@
       }
     }
 
-    /* LÓGICA DE EXCESO INDIVIDUAL CORREGIDA */
     function actualizarTiemposExceso() {
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const ahora = Date.now();
 
       trabajadores.forEach(t => {
-        // Un trabajador está activo SI Y SOLO SI está en la lista de asignados ACTUALES de una tarea activa o en pausa
         const estaEnTrabajoActivoOPausa = trabajosHoy.some(tr => 
           (tr.activo || tr.enPausa30) && tr.asignadosIds && tr.asignadosIds.includes(t.id)
         );
@@ -332,7 +331,6 @@
         if (estaEnTrabajoActivoOPausa) {
           delete inicioExcesoPorPersona[t.id];
         } else {
-          // Si no está asignado actualmente a una tarea activa, comprobamos si ha registrado actividad previamente hoy
           const haTrabajadoPreviamente = trabajosHoy.some(tr => 
             tr.iniciadoAlgunaVez && 
             ((tr.historialAsignados && tr.historialAsignados.includes(t.id)) || 
@@ -510,7 +508,7 @@
       }).join('');
     }
 
-    /* RENDER RESUMEN DEL DÍA (TABLA SIMPLIFICADA) */
+    /* RENDER RESUMEN DEL DÍA */
     function renderResumenDia() {
       const contenedor = document.getElementById('contenedorResumenDia');
       const trabajosHoy = obtenerTrabajosDelDiaActual();
@@ -831,6 +829,12 @@
         registrarTiempoEnNota(seleccionadoId, tr.nombre, tiempoInvertido, 'Desvinculado');
         tr.asignadosIds = tr.asignadosIds.filter(id => id !== seleccionadoId);
         
+        // Si el trabajo se queda totalmente sin personal, pausarlo
+        if (tr.asignadosIds.length === 0) {
+          tr.activo = false;
+          tr.enPausa30 = false;
+        }
+
         guardarDatos();
         closeObsPersonaModal();
         renderTrabajos();
@@ -900,27 +904,33 @@
       }
     }
 
-    /* VINCULAR PERSONAL */
+    /* VINCULAR PERSONAL (CON DESVINCULACIÓN AUTOMÁTICA DE OTROS TRABAJOS) */
     function openVincularModal(trabajoId) {
       trabajoSeleccionadoId = trabajoId;
       const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const tr = trabajosHoy.find(x => x.id === trabajoId);
-      document.getElementById('modalTrabajoVincularNombre').innerText = tr.nombre;
+      const trTarget = trabajosHoy.find(x => x.id === trabajoId);
+      document.getElementById('modalTrabajoVincularNombre').innerText = trTarget.nombre;
 
       const cont = document.getElementById('listaCheckPersonalVincular');
       
       if (trabajadores.length === 0) {
         cont.innerHTML = `<p class="text-xs text-gray-400 italic text-center py-4">No hay personal registrado. Añádelos en Ajustes ⚙️.</p>`;
       } else {
-        const asignadosActuales = tr.asignadosIds || [];
+        const asignadosActuales = trTarget.asignadosIds || [];
 
         cont.innerHTML = trabajadores.map(t => {
           const estaAsignado = asignadosActuales.includes(t.id);
+          
+          // Buscar si esta persona ya está asignada a otro trabajo actualmente
+          const trabajoActual = trabajosHoy.find(tr => tr.id !== trabajoId && tr.asignadosIds && tr.asignadosIds.includes(t.id));
+          const textoUbicacion = trabajoActual ? `<span class="text-[10px] text-amber-700 font-normal ml-1 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">[En: ${trabajoActual.nombre}]</span>` : '';
+
           return `
             <label class="flex items-center justify-between p-2.5 hover:bg-gray-50 rounded cursor-pointer border border-transparent hover:border-gray-200">
               <div class="flex items-center gap-2.5">
                 <input type="checkbox" value="${t.id}" ${estaAsignado ? 'checked' : ''} onchange="guardarVinculacionAuto()" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 check-vincular-persona">
                 <span class="text-xs font-semibold text-gray-800">${t.nombre}</span>
+                ${textoUbicacion}
               </div>
             </label>
           `;
@@ -936,27 +946,60 @@
       const seleccionadosIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
 
       const trabajosHoy = obtenerTrabajosDelDiaActual();
-      const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
+      const trTarget = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
 
-      if (tr) {
-        if (!tr.historialAsignados) tr.historialAsignados = [];
-        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+      if (trTarget) {
+        if (!trTarget.historialAsignados) trTarget.historialAsignados = [];
+        if (!trTarget.tiemposTrabajadores) trTarget.tiemposTrabajadores = {};
 
-        tr.asignadosIds.forEach(idViejo => {
-          if (!seleccionadosIds.includes(idViejo)) {
-            if (!tr.historialAsignados.includes(idViejo)) {
-              tr.historialAsignados.push(idViejo);
+        // 1. Desvincular de otros trabajos a las personas seleccionadas (Exclusividad)
+        seleccionadosIds.forEach(tId => {
+          trabajosHoy.forEach(tr => {
+            if (tr.id !== trTarget.id && tr.asignadosIds && tr.asignadosIds.includes(tId)) {
+              if (!tr.historialAsignados) tr.historialAsignados = [];
+              if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+
+              if (!tr.historialAsignados.includes(tId)) {
+                tr.historialAsignados.push(tId);
+              }
+              const tiempoInvertido = tr.tiemposTrabajadores[tId] || 0;
+              registrarTiempoEnNota(tId, tr.nombre, tiempoInvertido, `Movido a ${trTarget.nombre}`);
+
+              // Quitar de la tarea anterior
+              tr.asignadosIds = tr.asignadosIds.filter(id => id !== tId);
+
+              // Si la tarea previa se queda sin nadie, se frena/pausa
+              if (tr.asignadosIds.length === 0) {
+                tr.activo = false;
+                tr.enPausa30 = false;
+              }
             }
-            const tInvertido = tr.tiemposTrabajadores[idViejo] || 0;
-            registrarTiempoEnNota(idViejo, tr.nombre, tInvertido, 'Cambiado/Desvinculado');
+          });
+        });
+
+        // 2. Registrar desvinculaciones del propio trabajo si fueron desmarcados
+        (trTarget.asignadosIds || []).forEach(idViejo => {
+          if (!seleccionadosIds.includes(idViejo)) {
+            if (!trTarget.historialAsignados.includes(idViejo)) {
+              trTarget.historialAsignados.push(idViejo);
+            }
+            const tInvertido = trTarget.tiemposTrabajadores[idViejo] || 0;
+            registrarTiempoEnNota(idViejo, trTarget.nombre, tInvertido, 'Desvinculado');
           }
         });
 
-        tr.asignadosIds = seleccionadosIds;
-        tr.historialAsignados = Array.from(new Set([...tr.historialAsignados, ...seleccionadosIds]));
+        // 3. Asignar nuevo listado
+        trTarget.asignadosIds = seleccionadosIds;
+        trTarget.historialAsignados = Array.from(new Set([...trTarget.historialAsignados, ...seleccionadosIds]));
 
-        if (tr.asignadosIds.length > 0 && tr.tiempoRestanteSec === 0) {
-          tr.tiempoRestanteSec = tr.duracionMin * 60;
+        if (trTarget.asignadosIds.length > 0 && trTarget.tiempoRestanteSec === 0) {
+          trTarget.tiempoRestanteSec = trTarget.duracionMin * 60;
+        }
+
+        // Si se quita a todo el personal de este trabajo objetivo, detener
+        if (trTarget.asignadosIds.length === 0) {
+          trTarget.activo = false;
+          trTarget.enPausa30 = false;
         }
       }
 
