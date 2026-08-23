@@ -437,7 +437,7 @@
           } else if (!tr.activo && tr.tiempoRestanteSec > 0) {
             botonTiempoHTML = `
               <button onclick="event.stopPropagation(); toggleTimerTrabajo(${tr.id})" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
-                ▶ Iniciar
+                ▶ Iniciar (${formatearTiempo(tr.tiempoRestanteSec)})
               </button>`;
           } else if (tr.activo && tr.tiempoRestanteSec > 0) {
             botonTiempoHTML = `
@@ -456,7 +456,7 @@
             botonTiempoHTML = `<span class="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded">Finalizado</span>`;
           }
         } else {
-          botonTiempoHTML = `<span class="text-xs text-gray-400 border border-gray-200 px-2.5 py-1 rounded bg-gray-50">Sin asignar</span>`;
+          botonTiempoHTML = `<span class="text-xs text-gray-400 border border-gray-200 px-2.5 py-1 rounded bg-gray-50">Sin asignar (${formatearTiempo(tr.tiempoRestanteSec)})</span>`;
         }
 
         const etiquetasNombresHTML = integrantes.length > 0 
@@ -829,7 +829,7 @@
         registrarTiempoEnNota(seleccionadoId, tr.nombre, tiempoInvertido, 'Desvinculado');
         tr.asignadosIds = tr.asignadosIds.filter(id => id !== seleccionadoId);
         
-        // Si el trabajo se queda totalmente sin personal, pausarlo
+        // Si la tarea se queda vacía, se congela (mantiene tiempoRestanteSec)
         if (tr.asignadosIds.length === 0) {
           tr.activo = false;
           tr.enPausa30 = false;
@@ -968,7 +968,7 @@
               // Quitar de la tarea anterior
               tr.asignadosIds = tr.asignadosIds.filter(id => id !== tId);
 
-              // Si la tarea previa se queda sin nadie, se frena/pausa
+              // Si la tarea previa se queda sin nadie, se frena/pausa pero retiene el tiempo restante
               if (tr.asignadosIds.length === 0) {
                 tr.activo = false;
                 tr.enPausa30 = false;
@@ -992,11 +992,12 @@
         trTarget.asignadosIds = seleccionadosIds;
         trTarget.historialAsignados = Array.from(new Set([...trTarget.historialAsignados, ...seleccionadosIds]));
 
-        if (trTarget.asignadosIds.length > 0 && trTarget.tiempoRestanteSec === 0) {
+        // Inicializar tiempo acumulado solo si nunca antes había arrancado o si no tenía asignaciones previas
+        if (trTarget.tiempoRestanteSec === undefined) {
           trTarget.tiempoRestanteSec = trTarget.duracionMin * 60;
         }
 
-        // Si se quita a todo el personal de este trabajo objetivo, detener
+        // Si se quita a todo el personal de este trabajo objetivo, detener sin reiniciar el tiempo acumulado
         if (trTarget.asignadosIds.length === 0) {
           trTarget.activo = false;
           trTarget.enPausa30 = false;
