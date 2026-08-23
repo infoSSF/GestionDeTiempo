@@ -34,7 +34,7 @@
         </div>
 
         <!-- BOTÓN TRABAJOS DEL DÍA -->
-        <button onclick="openSeleccionTrabajosModal()" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 flex items-center gap-1.5 transition">
+        <button onclick="openSeleccionTrabajosModal()" class="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 flex items-center gap-1.5 transition shadow-sm">
           <span>📋</span> Trabajos del Día
         </button>
 
@@ -78,13 +78,11 @@
       </div>
 
       <div class="my-4 space-y-4">
-        <!-- Selector Modo -->
         <div class="flex bg-gray-100 p-1 rounded-lg">
           <button type="button" id="tabRangoHora" onclick="cambiarModoInsercion('rango')" class="flex-1 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-indigo-600">Por Rango de Horas</button>
           <button type="button" id="tabHorasTotales" onclick="cambiarModoInsercion('totales')" class="flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500">Por Horas Totales</button>
         </div>
 
-        <!-- Opción 1: Rango de Horas -->
         <div id="seccionRangoHora" class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -98,7 +96,6 @@
           </div>
         </div>
 
-        <!-- Opción 2: Horas Totales -->
         <div id="seccionHorasTotales" class="space-y-3 hidden">
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -196,19 +193,23 @@
     </div>
   </div>
 
-  <!-- MODAL SELECCIONAR / REPETIR TRABAJOS DEL DÍA -->
+  <!-- MODAL SELECCIONAR / FLUIDO TRABAJOS DEL DÍA -->
   <div id="seleccionTrabajosModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center pb-3 border-b">
         <h3 class="text-base font-bold text-gray-800">Planificar Trabajos del Día (<span id="modalFechaTitulo">--</span>)</h3>
         <button onclick="closeSeleccionTrabajosModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
       </div>
-      <p class="text-xs text-gray-500 my-3">Añade o quita instancias de cada trabajo. Puedes incluir el mismo trabajo varias veces en el mismo día.</p>
+      <p class="text-xs text-gray-500 my-3">
+        Haz <strong>clic directo</strong> para seleccionar/confirmar (1 unidad). Usa los botones <strong>+</strong> y <strong>-</strong> para ajustar la cantidad si quieres repetirlo.
+      </p>
       
-      <div id="listaCheckTrabajos" class="space-y-2 my-4 max-h-60 overflow-y-auto border border-gray-200 p-3 rounded-lg"></div>
+      <div id="listaCheckTrabajos" class="space-y-2.5 my-4 max-h-72 overflow-y-auto border border-gray-200 p-3 rounded-xl bg-gray-50/50"></div>
 
       <div class="text-right border-t pt-3">
-        <button onclick="closeSeleccionTrabajosModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs transition">Listo</button>
+        <button onclick="closeSeleccionTrabajosModal()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition shadow-sm">
+          Listo / Guardar
+        </button>
       </div>
     </div>
   </div>
@@ -397,7 +398,7 @@
       guardarDatos();
     }
 
-    /* LÓGICA DE MARCAS DE TIEMPO (TIMESTAMPS) */
+    /* TIMESTAMPS */
     function sincronizarTiemposTranscurridos() {
       const ahora = Date.now();
       const trabajosHoy = obtenerTrabajosDelDiaActual();
@@ -576,8 +577,8 @@
         return `
           <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 relative ${tr.activo ? 'border-indigo-400 bg-indigo-50/10' : ''}">
             
-            <!-- BOTÓN DE ELIMINACIÓN RÁPIDA (X) DE LA TARJETA -->
-            <button onclick="eliminarTrabajoDelDia('${tr.id}')" class="absolute top-3 right-3 text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-lg font-bold text-sm transition" title="Eliminar este trabajo de la lista">
+            <!-- BOTÓN DE ELIMINACIÓN (✕) EN CASILLA DE TRABAJO -->
+            <button onclick="eliminarTrabajoDelDia('${tr.id}')" class="absolute top-3 right-3 text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg font-bold text-sm transition" title="Eliminar este trabajo de la lista">
               ✕
             </button>
 
@@ -936,7 +937,7 @@
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", `Resumen_Simplificado_${fechaSeleccionada}.csv`);
+      link.setAttribute("download", `Resumen_Trabajos_${fechaSeleccionada}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1246,7 +1247,7 @@
       document.getElementById('vincularModal').classList.remove('flex');
     }
 
-    /* SELECCIÓN Y MULTIPLICIDAD DE TRABAJOS DEL DÍA */
+    /* SELECCIÓN FLUIDA + BOTONES (+/-) AMPLIADOS DE TRABAJOS */
     function openSeleccionTrabajosModal() {
       document.getElementById('modalFechaTitulo').innerText = fechaSeleccionada;
       renderListaSeleccionTrabajos();
@@ -1265,29 +1266,55 @@
       const trabajosHoy = obtenerTrabajosDelDiaActual();
 
       contenedor.innerHTML = catalogoTrabajos.map(item => {
-        const cantidadInstancias = trabajosHoy.filter(t => t.catalogoId === item.id).length;
+        const cantidad = trabajosHoy.filter(t => t.catalogoId === item.id).length;
+        const estaSeleccionado = cantidad > 0;
 
         return `
-          <div class="flex items-center justify-between p-2.5 hover:bg-gray-50 rounded border border-gray-100 transition">
-            <div class="text-xs">
-              <span class="font-semibold text-gray-800">${item.nombre}</span>
-              <span class="text-gray-500 ml-1">(${item.duracionMin} mins)</span>
+          <div onclick="clicDirectoTrabajo(${item.id})" class="flex items-center justify-between p-3 rounded-xl border transition cursor-pointer select-none ${estaSeleccionado ? 'bg-indigo-50/80 border-indigo-400 shadow-sm' : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'}">
+            
+            <div class="flex items-center gap-3">
+              <div class="w-5 h-5 rounded-full border flex items-center justify-center text-xs font-bold ${estaSeleccionado ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white text-transparent'}">
+                ✓
+              </div>
+              <div>
+                <span class="text-xs font-bold text-gray-800 block">${item.nombre}</span>
+                <span class="text-[11px] text-gray-500">${item.duracionMin} minutos</span>
+              </div>
             </div>
 
-            <div class="flex items-center gap-2">
-              <button onclick="alterarCantidadTrabajo(${item.id}, -1)" class="w-7 h-7 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs flex items-center justify-center transition">
-                -
-              </button>
-              <span class="text-xs font-bold w-6 text-center ${cantidadInstancias > 0 ? 'text-indigo-600 font-extrabold' : 'text-gray-400'}">
-                ${cantidadInstancias}
-              </span>
-              <button onclick="alterarCantidadTrabajo(${item.id}, 1)" class="w-7 h-7 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs flex items-center justify-center transition">
-                +
-              </button>
+            <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+              ${estaSeleccionado ? `
+                <button onclick="alterarCantidadTrabajo(${item.id}, -1)" class="w-9 h-9 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-gray-700 font-bold rounded-lg text-sm flex items-center justify-center transition shadow-sm" title="Quitar una unidad">
+                  -
+                </button>
+                <span class="text-sm font-extrabold w-7 text-center text-indigo-700 bg-indigo-100/60 py-1 rounded-md border border-indigo-200">
+                  ${cantidad}
+                </span>
+                <button onclick="alterarCantidadTrabajo(${item.id}, 1)" class="w-9 h-9 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm flex items-center justify-center transition shadow-sm" title="Añadir otra unidad del trabajo">
+                  +
+                </button>
+              ` : `
+                <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">
+                  Añadir
+                </span>
+              `}
             </div>
           </div>
         `;
       }).join('');
+    }
+
+    function clicDirectoTrabajo(catalogoId) {
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const cantidadActual = trabajosHoy.filter(t => t.catalogoId === catalogoId).length;
+
+      if (cantidadActual === 0) {
+        // Al clicar por primera vez, selecciona 1 unidad de inmediato
+        alterarCantidadTrabajo(catalogoId, 1);
+      } else {
+        // Si ya tenía unidades, al volver a hacer clic confirma y cierra
+        closeSeleccionTrabajosModal();
+      }
     }
 
     function alterarCantidadTrabajo(catalogoId, cambio) {
@@ -1297,7 +1324,7 @@
       if (!catItem) return;
 
       if (cambio > 0) {
-        // Añadir una nueva instancia independiente del trabajo
+        // Crear nueva instancia independiente del mismo cometido
         trabajosHoy.push({
           id: 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
           catalogoId: catItem.id,
@@ -1314,7 +1341,7 @@
           tiemposTrabajadores: {}
         });
       } else if (cambio < 0) {
-        // Quitar la última instancia añadida de este trabajo
+        // Desechar la última unidad agregada
         const indexUltimo = trabajosHoy.map(t => t.catalogoId).lastIndexOf(catalogoId);
         if (indexUltimo !== -1) {
           trabajosHoy.splice(indexUltimo, 1);
