@@ -69,6 +69,61 @@
     </div>
   </main>
 
+  <!-- MODAL INSERTAR TRABAJO COMPLETADO MANUALMENTE -->
+  <div id="insertarManualModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
+      <div class="flex justify-between items-center pb-3 border-b">
+        <h3 class="text-base font-bold text-gray-800">Insertar Trabajo Completado: <span id="modalInsertarNombreTrabajo" class="text-indigo-600">--</span></h3>
+        <button onclick="closeInsertarManualModal()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+      </div>
+
+      <div class="my-4 space-y-4">
+        <!-- Selector Modo -->
+        <div class="flex bg-gray-100 p-1 rounded-lg">
+          <button type="button" id="tabRangoHora" onclick="cambiarModoInsercion('rango')" class="flex-1 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-indigo-600">Por Rango de Horas</button>
+          <button type="button" id="tabHorasTotales" onclick="cambiarModoInsercion('totales')" class="flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500">Por Horas Totales</button>
+        </div>
+
+        <!-- Opción 1: Rango de Horas -->
+        <div id="seccionRangoHora" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Hora Inicio:</label>
+              <input type="time" id="inputHoraInicio" class="w-full p-2 text-xs border rounded-lg bg-gray-50">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Hora Fin:</label>
+              <input type="time" id="inputHoraFin" class="w-full p-2 text-xs border rounded-lg bg-gray-50">
+            </div>
+          </div>
+        </div>
+
+        <!-- Opción 2: Horas Totales -->
+        <div id="seccionHorasTotales" class="space-y-3 hidden">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Horas:</label>
+              <input type="number" id="inputHorasManual" min="0" placeholder="Ej: 2" class="w-full p-2 text-xs border rounded-lg bg-gray-50">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Minutos:</label>
+              <input type="number" id="inputMinutosManual" min="0" max="59" placeholder="Ej: 30" class="w-full p-2 text-xs border rounded-lg bg-gray-50">
+            </div>
+          </div>
+        </div>
+
+        <p class="text-[11px] text-gray-500 italic bg-amber-50 p-2 rounded border border-amber-200">
+          ⚠️ Este tiempo se asignará a todo el personal actualmente asignado a este trabajo.
+        </p>
+      </div>
+
+      <div class="flex justify-end gap-2 border-t pt-3">
+        <button onclick="closeInsertarManualModal()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg">Cancelar</button>
+        <button onclick="guardarTrabajoManual()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm">Insertar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL OBSERVACIONES DEL TRABAJO -->
   <div id="obsTrabajoModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative">
@@ -216,6 +271,7 @@
     let trabajoSeleccionadoId = null;
     let timerInterval = null;
     let pausaGeneralGlobal = false;
+    let modoInsercionManual = 'rango';
 
     document.getElementById('fechaPlan').value = fechaSeleccionada;
 
@@ -313,7 +369,6 @@
       pausaGeneralGlobal = !pausaGeneralGlobal;
       const btn = document.getElementById('btnPausaGeneral');
       
-      // Sincronizamos marcas de tiempo al conmutar pausa global
       sincronizarTiemposTranscurridos();
 
       if (pausaGeneralGlobal) {
@@ -336,7 +391,6 @@
       trabajosHoy.forEach(tr => {
         if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
 
-        // Sincronización para Pausa 30m
         if (tr.enPausa30 && tr.lastPausaTimestamp) {
           const segsTranscurridos = Math.floor((ahora - tr.lastPausaTimestamp) / 1000);
           if (segsTranscurridos > 0) {
@@ -352,7 +406,6 @@
             }
           }
         }
-        // Sincronización para Tareas Activas
         else if (tr.activo && tr.lastActiveTimestamp && !pausaGeneralGlobal) {
           const segsTranscurridos = Math.floor((ahora - tr.lastActiveTimestamp) / 1000);
           if (segsTranscurridos > 0) {
@@ -486,6 +539,11 @@
           botonTiempoHTML = `<span class="text-xs text-gray-400 border border-gray-200 px-2.5 py-1 rounded bg-gray-50">Sin asignar (${formatearTiempo(tr.tiempoRestanteSec)})</span>`;
         }
 
+        const botonInsertarManualHTML = `
+          <button onclick="event.stopPropagation(); openInsertarManualModal(${tr.id})" class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1" title="Insertar horas si se olvidó el temporizador">
+            <span>➕</span> Insertar trabajo completado
+          </button>`;
+
         const etiquetasNombresHTML = integrantes.length > 0 
           ? integrantes.map(t => {
               const segExceso = obtenerSegundosExceso(t.id);
@@ -514,7 +572,8 @@
                 ${tr.obs ? `<p class="text-xs text-indigo-600 italic mt-1 line-clamp-1">💬 ${tr.obs}</p>` : `<p class="text-[11px] text-gray-400 italic mt-0.5">Haz clic en el título para notas/observaciones del trabajo</p>`}
               </div>
 
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                ${botonInsertarManualHTML}
                 ${botonTiempoHTML}
               </div>
             </div>
@@ -533,6 +592,125 @@
           </div>
         `;
       }).join('');
+    }
+
+    /* MODAL INSERTAR MANUALMENTE */
+    function openInsertarManualModal(trabajoId) {
+      trabajoSeleccionadoId = trabajoId;
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === trabajoId);
+      if (!tr) return;
+
+      if (!tr.asignadosIds || tr.asignadosIds.length === 0) {
+        alert("Primero debes asignar al menos a una persona a este trabajo para poder registrarle el tiempo.");
+        return;
+      }
+
+      document.getElementById('modalInsertarNombreTrabajo').innerText = tr.nombre;
+      document.getElementById('inputHoraInicio').value = '';
+      document.getElementById('inputHoraFin').value = '';
+      document.getElementById('inputHorasManual').value = '';
+      document.getElementById('inputMinutosManual').value = '';
+
+      cambiarModoInsercion('rango');
+
+      document.getElementById('insertarManualModal').classList.remove('hidden');
+      document.getElementById('insertarManualModal').classList.add('flex');
+    }
+
+    function closeInsertarManualModal() {
+      document.getElementById('insertarManualModal').classList.add('hidden');
+      document.getElementById('insertarManualModal').classList.remove('flex');
+    }
+
+    function cambiarModoInsercion(modo) {
+      modoInsercionManual = modo;
+      const btnRango = document.getElementById('tabRangoHora');
+      const btnTotales = document.getElementById('tabHorasTotales');
+      const secRango = document.getElementById('seccionRangoHora');
+      const secTotales = document.getElementById('seccionHorasTotales');
+
+      if (modo === 'rango') {
+        btnRango.className = "flex-1 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-indigo-600";
+        btnTotales.className = "flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500";
+        secRango.classList.remove('hidden');
+        secTotales.classList.add('hidden');
+      } else {
+        btnTotales.className = "flex-1 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-indigo-600";
+        btnRango.className = "flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500";
+        secTotales.classList.remove('hidden');
+        secRango.classList.add('hidden');
+      }
+    }
+
+    function guardarTrabajoManual() {
+      sincronizarTiemposTranscurridos();
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+      const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
+      if (!tr) return;
+
+      let segundosCompletados = 0;
+      let detalleMotivo = '';
+
+      if (modoInsercionManual === 'rango') {
+        const hInicio = document.getElementById('inputHoraInicio').value;
+        const hFin = document.getElementById('inputHoraFin').value;
+
+        if (!hInicio || !hFin) {
+          alert("Por favor selecciona ambas horas (Inicio y Fin).");
+          return;
+        }
+
+        const [h1, m1] = hInicio.split(':').map(Number);
+        const [h2, m2] = hFin.split(':').map(Number);
+
+        const inicioMinutos = h1 * 60 + m1;
+        const finMinutos = h2 * 60 + m2;
+
+        if (finMinutos <= inicioMinutos) {
+          alert("La hora de fin debe ser posterior a la hora de inicio.");
+          return;
+        }
+
+        const diferenciaMinutos = finMinutos - inicioMinutos;
+        segundosCompletados = diferenciaMinutos * 60;
+        detalleMotivo = `Manual: ${hInicio} a ${hFin}`;
+      } else {
+        const hrs = parseInt(document.getElementById('inputHorasManual').value) || 0;
+        const mins = parseInt(document.getElementById('inputMinutosManual').value) || 0;
+
+        if (hrs === 0 && mins === 0) {
+          alert("Introduce las horas o minutos transcurridos.");
+          return;
+        }
+
+        segundosCompletados = (hrs * 3600) + (mins * 60);
+        detalleMotivo = `Manual: ${hrs}h ${mins}m agregados`;
+      }
+
+      if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+      if (!tr.historialAsignados) tr.historialAsignados = [];
+
+      (tr.asignadosIds || []).forEach(tId => {
+        tr.tiemposTrabajadores[tId] = (tr.tiemposTrabajadores[tId] || 0) + segundosCompletados;
+        if (!tr.historialAsignados.includes(tId)) {
+          tr.historialAsignados.push(tId);
+        }
+        registrarTiempoEnNota(tId, tr.nombre, segundosCompletados, detalleMotivo);
+      });
+
+      if (tr.tiempoRestanteSec > segundosCompletados) {
+        tr.tiempoRestanteSec -= segundosCompletados;
+      } else {
+        tr.tiempoRestanteSec = 0;
+      }
+
+      tr.iniciadoAlgunaVez = true;
+
+      guardarDatos();
+      closeInsertarManualModal();
+      renderTrabajos();
+      renderResumenDia();
     }
 
     /* RENDER RESUMEN DEL DÍA */
