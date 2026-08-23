@@ -230,6 +230,7 @@
 
     function cambiarFecha() {
       fechaSeleccionada = document.getElementById('fechaPlan').value;
+      sincronizarTiemposTranscurridos();
       renderTrabajos();
       renderResumenDia();
     }
@@ -282,18 +283,21 @@
       trabajo.tiempoRestanteSec = 0;
       trabajo.activo = false;
       trabajo.iniciadoAlgunaVez = true;
-      trabajo.asignadosIds = []; // Liberar personal al finalizar la tarea
+      trabajo.asignadosIds = [];
+      delete trabajo.lastActiveTimestamp;
     }
 
     function iniciarTodosLosTrabajos() {
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       let arrancado = false;
-      
+      const ahora = Date.now();
+
       trabajosHoy.forEach(tr => {
         if (tr.asignadosIds && tr.asignadosIds.length > 0 && tr.tiempoRestanteSec > 0) {
           tr.activo = true;
           tr.enPausa30 = false;
           tr.iniciadoAlgunaVez = true;
+          tr.lastActiveTimestamp = ahora;
           arrancado = true;
         }
       });
@@ -308,6 +312,10 @@
     function togglePausaGeneralGlobal() {
       pausaGeneralGlobal = !pausaGeneralGlobal;
       const btn = document.getElementById('btnPausaGeneral');
+      
+      // Sincronizamos marcas de tiempo al conmutar pausa global
+      sincronizarTiemposTranscurridos();
+
       if (pausaGeneralGlobal) {
         btn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
         btn.classList.add('bg-red-600', 'hover:bg-red-700', 'animate-pulse');
@@ -317,6 +325,55 @@
         btn.classList.add('bg-amber-500', 'hover:bg-amber-600');
         btn.innerHTML = `<span>⏸️</span> Pausa General (Todos)`;
       }
+      guardarDatos();
+    }
+
+    /* LÓGICA DE MARCAS DE TIEMPO (TIMESTAMPS) */
+    function sincronizarTiemposTranscurridos() {
+      const ahora = Date.now();
+      const trabajosHoy = obtenerTrabajosDelDiaActual();
+
+      trabajosHoy.forEach(tr => {
+        if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
+
+        // Sincronización para Pausa 30m
+        if (tr.enPausa30 && tr.lastPausaTimestamp) {
+          const segsTranscurridos = Math.floor((ahora - tr.lastPausaTimestamp) / 1000);
+          if (segsTranscurridos > 0) {
+            tr.tiempoPausa30Sec -= segsTranscurridos;
+            tr.lastPausaTimestamp = ahora;
+
+            if (tr.tiempoPausa30Sec <= 0) {
+              tr.enPausa30 = false;
+              tr.activo = true;
+              tr.tiempoPausa30Sec = 30 * 60;
+              tr.lastActiveTimestamp = ahora;
+              delete tr.lastPausaTimestamp;
+            }
+          }
+        }
+        // Sincronización para Tareas Activas
+        else if (tr.activo && tr.lastActiveTimestamp && !pausaGeneralGlobal) {
+          const segsTranscurridos = Math.floor((ahora - tr.lastActiveTimestamp) / 1000);
+          if (segsTranscurridos > 0) {
+            tr.lastActiveTimestamp = ahora;
+
+            if (segsTranscurridos >= tr.tiempoRestanteSec) {
+              const segsEfectivos = tr.tiempoRestanteSec;
+              (tr.asignadosIds || []).forEach(tId => {
+                tr.tiemposTrabajadores[tId] = (tr.tiemposTrabajadores[tId] || 0) + segsEfectivos;
+              });
+              finalizarOAvanzarTrabajo(tr, 'Tiempo agotado 100%');
+            } else {
+              tr.tiempoRestanteSec -= segsTranscurridos;
+              (tr.asignadosIds || []).forEach(tId => {
+                tr.tiemposTrabajadores[tId] = (tr.tiemposTrabajadores[tId] || 0) + segsTranscurridos;
+              });
+            }
+          }
+        }
+      });
+      guardarDatos();
     }
 
     function actualizarTiemposExceso() {
@@ -354,51 +411,21 @@
     }
 
     function iniciarBucleTemporizadores() {
+      sincronizarTiemposTranscurridos();
+      renderTrabajos();
+      renderResumenDia();
+
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
-        if (pausaGeneralGlobal) return;
-
-        let cambiado = false;
-        const trabajosHoy = obtenerTrabajosDelDiaActual();
-
-        trabajosHoy.forEach(tr => {
-          if (!tr.tiemposTrabajadores) tr.tiemposTrabajadores = {};
-
-          if (tr.enPausa30) {
-            cambiado = true;
-            if (tr.tiempoPausa30Sec > 0) {
-              tr.tiempoPausa30Sec--;
-            } else {
-              tr.enPausa30 = false;
-              tr.activo = true;
-              tr.tiempoPausa30Sec = 30 * 60;
-            }
-          } 
-          else if (tr.activo && tr.tiempoRestanteSec > 0) {
-            tr.tiempoRestanteSec--;
-            cambiado = true;
-
-            (tr.asignadosIds || []).forEach(tId => {
-              tr.tiemposTrabajadores[tId] = (tr.tiemposTrabajadores[tId] || 0) + 1;
-            });
-
-            if (tr.tiempoRestanteSec === 0) {
-              finalizarOAvanzarTrabajo(tr, 'Tiempo agotado 100%');
-            }
-          }
-        });
-
+        sincronizarTiemposTranscurridos();
         actualizarTiemposExceso();
-
-        if (cambiado) {
-          guardarDatos();
-          renderTrabajos();
-          renderResumenDia();
-        }
+        renderTrabajos();
+        renderResumenDia();
       }, 1000);
     }
 
     function formatearTiempo(segundos) {
+      if (segundos < 0) segundos = 0;
       const h = Math.floor(segundos / 3600);
       const m = Math.floor((segundos % 3600) / 60);
       const s = segundos % 60;
@@ -813,6 +840,7 @@
     }
 
     function desvincularPersonaActual() {
+      sincronizarTiemposTranscurridos();
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const tr = trabajosHoy.find(x => x.id === trabajoSeleccionadoId);
 
@@ -829,10 +857,10 @@
         registrarTiempoEnNota(seleccionadoId, tr.nombre, tiempoInvertido, 'Desvinculado');
         tr.asignadosIds = tr.asignadosIds.filter(id => id !== seleccionadoId);
         
-        // Si la tarea se queda vacía, se congela (mantiene tiempoRestanteSec)
         if (tr.asignadosIds.length === 0) {
           tr.activo = false;
           tr.enPausa30 = false;
+          delete tr.lastActiveTimestamp;
         }
 
         guardarDatos();
@@ -844,16 +872,19 @@
 
     /* CONTROLES DE TIEMPO DEL TRABAJO */
     function toggleTimerTrabajo(id) {
+      sincronizarTiemposTranscurridos();
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const tr = trabajosHoy.find(x => x.id === id);
+
       if (tr && tr.asignadosIds && tr.asignadosIds.length > 0) {
         tr.enPausa30 = false;
         tr.activo = !tr.activo;
+        
         if (tr.activo) {
           tr.iniciadoAlgunaVez = true;
-        }
-
-        if (!tr.activo) {
+          tr.lastActiveTimestamp = Date.now();
+        } else {
+          delete tr.lastActiveTimestamp;
           (tr.asignadosIds || []).forEach(trabajadorId => {
             const tiempoInvertido = (tr.tiemposTrabajadores && tr.tiemposTrabajadores[trabajadorId]) || 0;
             registrarTiempoEnNota(trabajadorId, tr.nombre, tiempoInvertido, 'Pausado manualmente');
@@ -867,12 +898,16 @@
     }
 
     function activarPausa30(id) {
+      sincronizarTiemposTranscurridos();
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const tr = trabajosHoy.find(x => x.id === id);
+
       if (tr) {
         tr.enPausa30 = true;
         tr.tiempoPausa30Sec = 30 * 60;
         tr.activo = false;
+        tr.lastPausaTimestamp = Date.now();
+        delete tr.lastActiveTimestamp;
         guardarDatos();
         renderTrabajos();
         renderResumenDia();
@@ -880,11 +915,15 @@
     }
 
     function cancelarPausa30(id) {
+      sincronizarTiemposTranscurridos();
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const tr = trabajosHoy.find(x => x.id === id);
+
       if (tr) {
         tr.enPausa30 = false;
         tr.activo = true;
+        tr.lastActiveTimestamp = Date.now();
+        delete tr.lastPausaTimestamp;
         guardarDatos();
         renderTrabajos();
         renderResumenDia();
@@ -892,6 +931,7 @@
     }
 
     function confirmarFinalizarTrabajo(id) {
+      sincronizarTiemposTranscurridos();
       const trabajosHoy = obtenerTrabajosDelDiaActual();
       const tr = trabajosHoy.find(x => x.id === id);
       if (!tr) return;
@@ -904,7 +944,7 @@
       }
     }
 
-    /* VINCULAR PERSONAL (CON DESVINCULACIÓN AUTOMÁTICA DE OTROS TRABAJOS) */
+    /* VINCULAR PERSONAL */
     function openVincularModal(trabajoId) {
       trabajoSeleccionadoId = trabajoId;
       const trabajosHoy = obtenerTrabajosDelDiaActual();
@@ -920,8 +960,6 @@
 
         cont.innerHTML = trabajadores.map(t => {
           const estaAsignado = asignadosActuales.includes(t.id);
-          
-          // Buscar si esta persona ya está asignada a otro trabajo actualmente
           const trabajoActual = trabajosHoy.find(tr => tr.id !== trabajoId && tr.asignadosIds && tr.asignadosIds.includes(t.id));
           const textoUbicacion = trabajoActual ? `<span class="text-[10px] text-amber-700 font-normal ml-1 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">[En: ${trabajoActual.nombre}]</span>` : '';
 
@@ -942,6 +980,7 @@
     }
 
     function guardarVinculacionAuto() {
+      sincronizarTiemposTranscurridos();
       const checkboxes = document.querySelectorAll('.check-vincular-persona:checked');
       const seleccionadosIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
 
@@ -952,7 +991,6 @@
         if (!trTarget.historialAsignados) trTarget.historialAsignados = [];
         if (!trTarget.tiemposTrabajadores) trTarget.tiemposTrabajadores = {};
 
-        // 1. Desvincular de otros trabajos a las personas seleccionadas (Exclusividad)
         seleccionadosIds.forEach(tId => {
           trabajosHoy.forEach(tr => {
             if (tr.id !== trTarget.id && tr.asignadosIds && tr.asignadosIds.includes(tId)) {
@@ -965,19 +1003,17 @@
               const tiempoInvertido = tr.tiemposTrabajadores[tId] || 0;
               registrarTiempoEnNota(tId, tr.nombre, tiempoInvertido, `Movido a ${trTarget.nombre}`);
 
-              // Quitar de la tarea anterior
               tr.asignadosIds = tr.asignadosIds.filter(id => id !== tId);
 
-              // Si la tarea previa se queda sin nadie, se frena/pausa pero retiene el tiempo restante
               if (tr.asignadosIds.length === 0) {
                 tr.activo = false;
                 tr.enPausa30 = false;
+                delete tr.lastActiveTimestamp;
               }
             }
           });
         });
 
-        // 2. Registrar desvinculaciones del propio trabajo si fueron desmarcados
         (trTarget.asignadosIds || []).forEach(idViejo => {
           if (!seleccionadosIds.includes(idViejo)) {
             if (!trTarget.historialAsignados.includes(idViejo)) {
@@ -988,19 +1024,17 @@
           }
         });
 
-        // 3. Asignar nuevo listado
         trTarget.asignadosIds = seleccionadosIds;
         trTarget.historialAsignados = Array.from(new Set([...trTarget.historialAsignados, ...seleccionadosIds]));
 
-        // Inicializar tiempo acumulado solo si nunca antes había arrancado o si no tenía asignaciones previas
         if (trTarget.tiempoRestanteSec === undefined) {
           trTarget.tiempoRestanteSec = trTarget.duracionMin * 60;
         }
 
-        // Si se quita a todo el personal de este trabajo objetivo, detener sin reiniciar el tiempo acumulado
         if (trTarget.asignadosIds.length === 0) {
           trTarget.activo = false;
           trTarget.enPausa30 = false;
+          delete trTarget.lastActiveTimestamp;
         }
       }
 
@@ -1041,6 +1075,7 @@
     }
 
     function guardarTrabajosDelDiaAuto() {
+      sincronizarTiemposTranscurridos();
       const checkboxes = document.querySelectorAll('.check-trabajo-dia:checked');
       const seleccionadosIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
 
@@ -1184,8 +1219,6 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      renderTrabajos();
-      renderResumenDia();
       iniciarBucleTemporizadores();
     });
   </script>
